@@ -21,7 +21,6 @@ def first_five_bills_campaign():
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].replace('nan','')
         first_five_bills['city'] = first_five_bills['city'].str.capitalize()
         first_five_bills['customer_name'] = first_five_bills['customer_name'].str.upper()
-        first_five_bills.to_csv('first_five_bills.csv',index=False)
         # Creating a new column free_gift and assigning the value 'A MOR Z Multivitamin Tablets' if the campaign_type is 'FREE_OTC' else an empty string
         first_five_bills['free_gift'] = np.where(first_five_bills['campaign_type']=='FREE_OTC','A MOR Z Multivitamin Tablets','')
         # Create a new column for JSON data, excluding 'mobile_number'
@@ -45,5 +44,9 @@ def first_five_bills_campaign():
     
     except Exception as e:
         logging()
+
     # Insert the data into the database
-    # create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+    create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+
+
+    ## Generate voucher code

@@ -1,11 +1,11 @@
 import json
 import pandas as pd
-from utils.logger import logging
+from utils.logger import logging, logger
 
 def sales_processing(data):
     try:
         if data.empty:
-            logging.error(f"Input data in Sales_processing.py is empty")
+            logger.error(f"Input data in Sales_processing.py is empty")
             raise ValueError("Input data in Sales_processing.py is empty")
 
         grouped_data = data.groupby('customer_id').apply(lambda group: json.dumps([

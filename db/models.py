@@ -50,7 +50,7 @@ class CampaignActivity(Base):
 engine_mre = create_engine(conn_string_mre())
 Base.metadata.create_all(bind=engine_mre)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_mre)
+
 
 class CompareSavings(Base):
     __tablename__ = 'compare_savings'
@@ -64,12 +64,13 @@ class CompareSavings(Base):
 engine_ecom = create_engine(conn_string_ecom())
 Base.metadata.create_all(bind=engine_ecom)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_ecom)
 
 def create_session_ecom():
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_ecom)
     return SessionLocal()
 
 def create_session():
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_mre)
     return SessionLocal()
 
 

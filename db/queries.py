@@ -74,47 +74,46 @@ ASSURED_QUERY = '''
     '''
 
 
-REPEAT_CUSTOMER_QUERY = '''SELECT 
-  c.id AS customer_id,
-  c.customer_code,
-  c.full_name AS customer_name,
-  c.mobile_number AS mobile_number,
-  c.no_of_bills,
-  c.ltv,
-  c.loyalty_points,
-  c.last_purchase_bill_date,
-  stores.name as last_purchase_store_name,
-  case when upper(stores.state)='GUJARAT' then 'GUJARATI' else 'HINDI' END as language
-  
-FROM 
-  customers c 
-INNER JOIN 
-  stores ON c.last_purchase_store_id = stores.id
-WHERE 
-  stores.store_type = 'COCO' 
-  AND (
-    c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
-    OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
-    OR c.last_purchase_bill_date + INTERVAL '87 days' = CURRENT_DATE
-  );
+REPEAT_CUSTOMER_QUERY = '''
+    SELECT 
+        c.id AS customer_id,
+        c.customer_code,
+        c.full_name AS customer_name,
+        c.mobile_number AS mobile_number,
+        c.no_of_bills,
+        c.ltv,
+        c.loyalty_points,
+        c.last_purchase_bill_date,
+        stores.name as last_purchase_store_name,
+        case when upper(stores.state)='GUJARAT' then 'GUJARATI' else 'HINDI' END as language      
+    FROM customers c 
+    INNER JOIN stores ON c.last_purchase_store_id = stores.id
+    WHERE 
+        stores.store_type = 'COCO' 
+        AND (
+            c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
+            OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
+            OR c.last_purchase_bill_date + INTERVAL '87 days' = CURRENT_DATE);
+    '''
 
-'''
-
-SALES_REPEAT_QUERY = '''SELECT
-                    si.store_id,
-                    TO_CHAR(si.created_at::date, 'YYYY-MM-DD') AS "billdate",
-                    si.customer_id as customer_id,
-                    si.id as sales_invoice_id,
-                    sid.product_id,
-                    p.ws_code as product_code,
-                    sid.quantity AS "Quantity",
-                    sid.bill_amount AS "Amount"
-                FROM sales_invoice_details sid
-                LEFT JOIN sales_invoices si ON sid.sales_invoice_id = si.id
-                LEFT JOIN stores s ON si.store_id = s.id
-                LEFT JOIN products p ON sid.product_id = p.id
-                WHERE sid.deleted_at IS NULL
-                AND si.created_at::date >= NOW()-  INTERVAL '90 days'  '''
+SALES_REPEAT_QUERY = '''
+    SELECT
+        si.store_id,
+        TO_CHAR(si.created_at::date, 'YYYY-MM-DD') AS "billdate",
+        si.customer_id as customer_id,
+        si.id as sales_invoice_id,
+        sid.product_id,
+        p.ws_code as product_code,
+        sid.quantity AS "Quantity",
+        sid.bill_amount AS "Amount"
+    FROM sales_invoice_details sid
+    LEFT JOIN sales_invoices si ON sid.sales_invoice_id = si.id
+    LEFT JOIN stores s ON si.store_id = s.id
+    LEFT JOIN products p ON sid.product_id = p.id
+    WHERE 
+        sid.deleted_at IS NULL
+        AND si.created_at::date >= NOW()-  INTERVAL '90 days'  
+    '''
 
 LOST_CUSTOMER_QUERY = '''
     SELECT
@@ -137,6 +136,18 @@ LOST_CUSTOMER_QUERY = '''
         AND (c.last_purchase_bill_date + INTERVAL '6 months' >= CURRENT_DATE
             AND c.last_purchase_bill_date + INTERVAL '3 months' < CURRENT_DATE);
     '''
+
+def update_customer_campaign(successful_id):
+    query = f'''
+        UPDATE customer_campaigns
+            SET is_message_sent = true,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE 
+            is_message_sent IS false
+            AND id IN ({successful_id});
+    '''
+
+    return query
 
 def get_lost_customer_sales_query(customer_ids: tuple = (-1,), reference_date: datetime.date = None) -> str:
 
@@ -172,57 +183,62 @@ def get_repeat_customer_sales_query(customer_ids: list) -> str:
 
     formatted_customer_ids = tuple(customer_ids) if len(customer_ids) > 1 else f"({customer_ids[0]})"
     
-    return f'''SELECT
-                    si.store_id,
-                    TO_CHAR(si.created_at::date, 'YYYY-MM-DD') AS "billdate",
-                    si.customer_id as customer_id,
-                    si.id as sales_invoice_id,
-                    sid.product_id,
-                    p.ws_code as product_code,
-                    sid.quantity AS "Quantity",
-                    sid.bill_amount AS "Amount"
-                FROM sales_invoice_details sid
-                LEFT JOIN sales_invoices si ON sid.sales_invoice_id = si.id
-                LEFT JOIN stores s ON si.store_id = s.id
-                LEFT JOIN products p ON sid.product_id = p.id
-                WHERE sid.deleted_at IS NULL
-                AND si.customer_id IN {formatted_customer_ids}
-                AND si.created_at::date >= NOW()-  INTERVAL '90 days'  '''
+    return f'''
+        SELECT
+            si.store_id,
+            TO_CHAR(si.created_at::date, 'YYYY-MM-DD') AS "billdate",
+            si.customer_id as customer_id,
+            si.id as sales_invoice_id,
+            sid.product_id,
+            p.ws_code as product_code,
+            sid.quantity AS "Quantity",
+            sid.bill_amount AS "Amount"
+        FROM sales_invoice_details sid
+        LEFT JOIN sales_invoices si ON sid.sales_invoice_id = si.id
+        LEFT JOIN stores s ON si.store_id = s.id
+        LEFT JOIN products p ON sid.product_id = p.id
+        WHERE 
+            sid.deleted_at IS NULL
+            AND si.customer_id IN {formatted_customer_ids}
+            AND si.created_at::date >= NOW()-  INTERVAL '90 days'  
+        '''
 
-FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''SELECT 
-  c.id AS customer_id,
-  c.customer_code,
-  c.full_name AS customer_name,
-  c.mobile_number AS mobile_number,
-  c.no_of_bills,
-  c.ltv,
-  c.loyalty_points,
-  c.last_purchase_bill_date,
-  stores.name AS last_purchase_store_name,
-  CASE 
-    WHEN UPPER(stores.state) = 'GUJARAT' THEN 'GUJARATI' 
-    ELSE 'HINDI' 
-  END AS language,
-  stores.city,
-  CASE 
-    WHEN c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE THEN 'MSP'
-    WHEN c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE AND c.no_of_bills < 3 THEN 'MSP'
-    WHEN c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE AND c.no_of_bills > 2 THEN 'FREE_OTC'
-    WHEN c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE AND c.no_of_bills > 3 THEN '25_RUPEES'
-    ELSE '0' 
-  END AS campaign_type
-FROM 
-  customers c 
-INNER JOIN 
-  stores ON c.last_purchase_store_id = stores.id
-WHERE 
-  stores.store_type = 'COCO' 
-  AND c.no_of_bills < 5 
-  AND c.aov > 100
-  and c.last_purchase_bill_date::date >= '2025-01-01'
-  AND 
-  ( c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
-    OR c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE
-    OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
-  ) '''
+FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
+    SELECT 
+        c.id AS customer_id,
+        c.customer_code,
+        c.full_name AS customer_name,
+        c.mobile_number AS mobile_number,
+        c.no_of_bills,
+        c.ltv,
+        c.loyalty_points,
+        c.last_purchase_bill_date,
+        stores.name AS last_purchase_store_name,
+        CASE 
+            WHEN UPPER(stores.state) = 'GUJARAT' THEN 'GUJARATI' 
+            ELSE 'HINDI' 
+        END AS language,
+        stores.city,
+        CASE 
+            WHEN c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE THEN 'MSP'
+            WHEN c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE AND c.no_of_bills < 3 THEN 'MSP'
+            WHEN c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE AND c.no_of_bills > 2 THEN 'FREE_OTC'
+            WHEN c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE AND c.no_of_bills > 3 THEN '25_RUPEES'
+            ELSE '0' 
+        END AS campaign_type
+    FROM customers c 
+    INNER JOIN stores ON c.last_purchase_store_id = stores.id
+    WHERE 
+        stores.store_type = 'COCO' 
+        AND c.no_of_bills < 5 
+        AND c.aov > 100
+        and c.last_purchase_bill_date::date >= '2025-01-01'
+        AND 
+        ( c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
+            OR c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE
+            OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
+        ) 
+    '''
+
+
 
