@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-LOG_FILE = os.getenv('LOG_FILE')
+LOG_FILE = os.getenv('LOG_FILE')    
 DB_WMS_HOST = os.getenv("DB_WMS_READ_HOST")
 DB_WMS_PORT = os.getenv("DB_WMS_PORT")
 DB_WMS_NAME = os.getenv("DB_WMS_NAME")
