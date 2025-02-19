@@ -82,7 +82,6 @@ def first_five_bills_campaign():
         first_five_bills = fetch_first_five_bills(engine)
         first_five_bills = preprocess_data_first_five(first_five_bills)
         result_df = store_results(first_five_bills)
-        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
         
         logger.info(f"Added the first five bills campaign data to the database.")
 
@@ -95,9 +94,12 @@ def first_five_bills_campaign():
         voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
         insert_gift_voucher_codes(session_pos, result_df, voucher_id)
         insert_gift_voucher_stores(session_pos, voucher_id)
+        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+        session_pos.commit()
 
     except Exception as e:
         logging()
+        session_pos.rollback()
         return
     
     finally:

@@ -132,9 +132,13 @@ def main():
         voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
         insert_gift_voucher_codes(session_pos, result_df, voucher_id)
         insert_gift_voucher_stores(session_pos, voucher_id)
+        # CREATE ENTRY
+        session_pos.commit()
 
     except Exception as e:
         logging()
+        session_pos.rollback()
+        return
 
     finally:
         session_pos.close()
