@@ -16,8 +16,10 @@ VOUCHER_AMOUNT = 1
 MINIMUM_ORDER_VALUE = 500
 
 def fetch_first_five_bills(engine):
+    '''Function to load the data from the database by executing the Query'''
     try:
         first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
+        return first_five_bills
 
     except Exception as e:
         logging()
@@ -25,6 +27,7 @@ def fetch_first_five_bills(engine):
 
 
 def preprocess_data_first_five(first_five_bills):
+    '''Function to preprocess the raw first five bills data and add the additional json to the data.'''
     try:
         # Converting the columns to string type
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].astype('str')
@@ -57,6 +60,7 @@ def preprocess_data_first_five(first_five_bills):
 
 
 def store_results(first_five_bills):
+    '''Function to create a final dataframe with all the required fields'''
     try:
         # Create the final DataFrame with 'mobile_number' and 'json_data'
         result_df = first_five_bills[['mobile_number','customer_code','campaign_type','language', 'json_data']]
@@ -71,7 +75,7 @@ def store_results(first_five_bills):
 
 
 def first_five_bills_campaign():
-    ''''''
+    '''Main function to process the first five bills campaign data, store it in the database, and generate gift vouchers and update the three tables all together'''
     try:
         engine = get_db_engine_pos()
         engine_mre = get_db_engine_mre()

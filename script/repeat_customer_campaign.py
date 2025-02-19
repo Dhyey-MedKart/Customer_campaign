@@ -3,7 +3,14 @@ import numpy as np
 import pandas as pd
 from utils.logger import logging
 from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms
+from services.voucher_processing import generate_voucher_code, insert_gift_voucher_codes, insert_gift_voucher_stores, create_gift_voucher_summary
 from db.common_helper import get_data, create_entry
+from datetime import date, timedelta
+from pandas.tseries.offsets import DateOffset
+
+VOUCHER_AMOUNT = 25
+MINIMUM_ORDER_VALUE = 500
+
 from db.queries import (
     SALES_REPEAT_QUERY,
     REPEAT_CUSTOMER_QUERY,
@@ -81,6 +88,16 @@ def merge_and_prepare_final_df(repeat_customers, processed_data):
             ['no_of_bills', 'ltv', 'loyalty_points', 'last_purchase_bill_date']
         ].astype(str)
         final_df['json_data'] = final_df.apply(generate_json_data, axis=1)
+
+        ### ADDING THE JSON DATA
+        final_df['json_data'] = final_df['json_data'].apply(lambda x: json.loads(x))
+        final_df['json_data'] = final_df['json_data'].apply(lambda x: {**x, **{
+            'voucher_code': generate_voucher_code(),
+            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+            'voucher_amount': VOUCHER_AMOUNT,
+            'minimum_order_value': MINIMUM_ORDER_VALUE
+        }})
+
         return final_df
     except Exception as e:
         logging()
@@ -109,6 +126,19 @@ def main():
         create_entry(result_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
+
+    try:
+        session_pos = engine_pos.connect()
+        voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
+        insert_gift_voucher_codes(session_pos, result_df, voucher_id)
+        insert_gift_voucher_stores(session_pos, voucher_id)
+
+    except Exception as e:
+        logging()
+
+    finally:
+        session_pos.close()
+
 
 # if __name__ == "__main__":
 

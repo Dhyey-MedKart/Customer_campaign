@@ -1,11 +1,12 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, date
 import sys
 from utils.logger import logging
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
 from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms
+from services.voucher_processing import generate_voucher_code, create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from db.common_helper import get_data, create_entry
 from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY
 from services.customer_processing import (
@@ -13,6 +14,9 @@ from services.customer_processing import (
     generate_json_data
 )
 from services.sales_processing import sales_processing
+
+VOUCHER_AMOUNT = 25
+MINIMUM_ORDER_VALUE = 500
 
 def load_customers(engine):
     """
@@ -122,7 +126,6 @@ def assign_campaign_types(customers, sales_data):
         logging()
         return pd.DataFrame()
 
-
 def build_final_dataframe(customers, sales_data, reference_date):
     """
     Merge customer and sales data, transform fields, and prepare the final result DataFrame.
@@ -139,6 +142,16 @@ def build_final_dataframe(customers, sales_data, reference_date):
 
         # Create JSON
         merged_df['json_data'] = merged_df.apply(generate_json_data, axis=1)
+
+        ## ADDING THE EXTRA JSON DATA 
+        merged_df['json_data'] = merged_df['json_data'].apply(lambda x: json.loads(x))
+        merged_df['json_data'] = merged_df['json_data'].apply(lambda x: {**x, **{
+            'voucher_code': generate_voucher_code(),
+            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+            'voucher_amount': VOUCHER_AMOUNT,
+            'minimum_order_value': MINIMUM_ORDER_VALUE
+        }})
+
 
         # Select and rename columns
         result_df = merged_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']].copy()
@@ -171,11 +184,21 @@ def main():
     except Exception as e:
         logging()
 
+    try:
+        session_pos = engine_pos.connect()
+        voucher_id = create_gift_voucher_summary(session_pos, len(final_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
+        insert_gift_voucher_codes(session_pos, final_df.itertuples(), voucher_id)
+        insert_gift_voucher_stores(session_pos, voucher_id)
+
+    except Exception as e:
+        logging()
+
+    finally:
+        session_pos.close()
 
 today = datetime.today().day
-if today not in [5, 20,18]:
+if today not in [5, 20]:
     logging()
     sys.exit()
 main()
-
 
