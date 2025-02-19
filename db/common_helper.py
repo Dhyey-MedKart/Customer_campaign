@@ -13,10 +13,15 @@ def create_entry(master,table_name,engine):
         session.commit()
         logger.info(f"Successfully created entry for {table_name}")
         return True
+
     except Exception as e:
         logging()
         session.rollback()
         return False
+
+    finally:
+        session.close()
+
 
 def get_data(query,engine):
     try:

@@ -241,4 +241,14 @@ FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
     '''
 
 
+INSERT_GIFT_VOUCHER_STORE_QUERY = '''
+    SELECT 
+        id 
+    FROM stores
+    WHERE 
+        store_type ='COCO' 
+        AND is_active= True 
+        AND is_pos_applicable = True 
+        AND id <>24 ; 
+    '''
 
