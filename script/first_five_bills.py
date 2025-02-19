@@ -15,16 +15,16 @@ import numpy as np
 VOUCHER_AMOUNT = 1
 MINIMUM_ORDER_VALUE = 500
 
-def first_five_bills_campaign():
+def fetch_first_five_bills(engine):
     try:
-        engine = get_db_engine_pos()
-        engine_mre = get_db_engine_mre()
         first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
-    
+
     except Exception as e:
         logging()
-        return
-    
+        return pd.DataFrame()
+
+
+def preprocess_data_first_five(first_five_bills):
     try:
         # Converting the columns to string type
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].astype('str')
@@ -50,24 +50,37 @@ def first_five_bills_campaign():
             'voucher_amount': VOUCHER_AMOUNT,
             'minimum_order_value': MINIMUM_ORDER_VALUE
         }, default=convert_decimal), axis=1)
-        
 
-        # insert_gift_voucher_stores(session_pos, voucher_id)
+    except Exception as e:
+        logging()
+        return first_five_bills
 
+
+def store_results(first_five_bills):
+    try:
         # Create the final DataFrame with 'mobile_number' and 'json_data'
         result_df = first_five_bills[['mobile_number','customer_code','campaign_type','language', 'json_data']]
         result_df = result_df.rename(columns={'mobile_number':'customer_mobile'})
         result_df = result_df[result_df['campaign_type']!='0']
         result_df['campaign'] = 'FIRST_FIVE_BILLS'
- 
-        logger.info(f"Data transformation for first five bills campaign completed")
+        return result_df
     
     except Exception as e:
         logging()
-        return
+        return first_five_bills
 
+
+def first_five_bills_campaign():
+    ''''''
     try:
+        engine = get_db_engine_pos()
+        engine_mre = get_db_engine_mre()
+        first_five_bills = fetch_first_five_bills(engine)
+        first_five_bills = preprocess_data_first_five(first_five_bills)
+        result_df = store_results(first_five_bills)
         create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+        
+        logger.info(f"Added the first five bills campaign data to the database.")
 
     except Exception as e:
         logging()
