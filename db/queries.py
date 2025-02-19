@@ -160,6 +160,28 @@ def update_customer_campaign(successful_id):
 
     return query
 
+
+
+def get_customer_campaign_data(round):
+    query = f'''
+        select 
+            id, 
+            customer_mobile,
+            customer_code,
+            campaign_type, 
+            language, 
+            json_data, 
+            round,
+            campaign,
+            savings_url
+        from customer_campaigns 
+        where 
+            round = {round} 
+            and is_message_sent is false;
+    '''
+
+    return query
+
 def get_lost_customer_sales_query(customer_ids: tuple = (-1,), reference_date: datetime.date = None) -> str:
 
     if reference_date is None:

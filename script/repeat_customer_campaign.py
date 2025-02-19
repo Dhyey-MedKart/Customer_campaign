@@ -2,13 +2,15 @@ import json
 import numpy as np
 import pandas as pd
 from utils.logger import logging
-from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms
+from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
 from db.common_helper import get_data, create_entry
 from db.queries import (
     SALES_REPEAT_QUERY,
     REPEAT_CUSTOMER_QUERY,
-    ASSURED_QUERY
+    ASSURED_QUERY,
+    PRODUCT_MAPPED_DATA
 )
+from services.generate_savings_url import generate_savings_data_url
 from services.customer_processing import (
     customer_branded_chronic_purchase,
     generate_json_data
@@ -17,10 +19,24 @@ from services.sales_processing import sales_processing
 
 def initialize_engines():
     try:
-        return get_db_engine_pos(), get_db_engine_mre(), get_db_engine_wms()
+        return get_db_engine_pos(), get_db_engine_mre(), get_db_engine_wms(), get_db_engine_ecom()
     except Exception as e:
         logging()
         raise
+
+def load_mapped_products(engine):
+    """
+    Load repeat customers from the database and convert the date column.
+    """
+    try:
+        products = get_data(PRODUCT_MAPPED_DATA, engine)
+        prod_mapping = dict(zip(products['ws_code'], products['id']))
+        return prod_mapping
+    except Exception as e:
+        logging()
+        return {}
+
+
 
 def fetch_repeat_customers(engine_pos):
     try:
@@ -99,13 +115,18 @@ def prepare_result_df(final_df):
 
 def main():
     try:
-        engine_pos, engine_mre, engine_wms = initialize_engines()
+        engine_pos, engine_mre, engine_wms, engine_ecom = initialize_engines()
         repeat_customers, repeat_customer_ids = fetch_repeat_customers(engine_pos)
         sales_data = fetch_sales_data(engine_pos, repeat_customer_ids)
         processed_data = process_data(engine_wms, sales_data)
         repeat_customers = assign_campaign_types(repeat_customers, processed_data)
         final_df = merge_and_prepare_final_df(repeat_customers, processed_data)
         result_df = prepare_result_df(final_df)
+        
+        # URL
+        product_mapped_data = load_mapped_products(engine_ecom)
+        result_df = generate_savings_data_url(result_df, product_mapped_data)
+
         create_entry(result_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()

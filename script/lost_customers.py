@@ -15,6 +15,15 @@ from services.customer_processing import (
 from services.generate_savings_url import generate_savings_data_url
 from services.sales_processing import sales_processing
 
+
+def initialize_engines():
+    try:
+        return get_db_engine_pos(), get_db_engine_mre(), get_db_engine_wms(), get_db_engine_ecom()
+    except Exception as e:
+        logging()
+        raise
+
+
 def load_customers(engine):
     """
     Load repeat customers from the database and convert the date column.
@@ -169,10 +178,7 @@ def build_final_dataframe(customers, sales_data, reference_date):
 
 def main():
     try:
-        engine_pos = get_db_engine_pos()
-        engine_wms = get_db_engine_wms()
-        engine_ecom = get_db_engine_ecom()
-        engine_mre = get_db_engine_mre()
+        engine_pos, engine_mre, engine_wms, engine_ecom = initialize_engines()
         customers = load_customers(engine_pos)
         today = datetime.today()
         reference_date = compute_reference_date(today)
@@ -187,7 +193,7 @@ def main():
 
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
-        final_df = generate_savings_data_url(customers, product_mapped_data)
+        final_df = generate_savings_data_url(final_df, product_mapped_data)
 
         final_df.to_csv('lost_cust.csv')
         # create entry
