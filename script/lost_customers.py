@@ -5,13 +5,14 @@ from utils.logger import logging
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
-from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms
+from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
 from db.common_helper import get_data, create_entry
-from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY
+from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY, PRODUCT_MAPPED_DATA
 from services.customer_processing import (
     customer_branded_chronic_purchase,
     generate_json_data
 )
+from services.generate_savings_url import generate_savings_data_url
 from services.sales_processing import sales_processing
 
 def load_customers(engine):
@@ -25,6 +26,20 @@ def load_customers(engine):
     except Exception as e:
         logging()
         return pd.DataFrame()
+
+def load_mapped_products(engine):
+    """
+    Load repeat customers from the database and convert the date column.
+    """
+    try:
+        products = get_data(PRODUCT_MAPPED_DATA, engine)
+        prod_mapping = dict(zip(products['ws_code'], products['id']))
+        return prod_mapping
+    except Exception as e:
+        logging()
+        return {}
+
+
 
 def compute_reference_date(today):
     """
@@ -156,6 +171,8 @@ def main():
     try:
         engine_pos = get_db_engine_pos()
         engine_wms = get_db_engine_wms()
+        engine_ecom = get_db_engine_ecom()
+        engine_mre = get_db_engine_mre()
         customers = load_customers(engine_pos)
         today = datetime.today()
         reference_date = compute_reference_date(today)
@@ -167,13 +184,20 @@ def main():
         processed_sales = process_sales_data(assured_mapping, sales_data)
         customers = assign_campaign_types(customers, processed_sales)
         final_df = build_final_dataframe(customers, processed_sales, reference_date)
+
+        # URL parameter
+        product_mapped_data = load_mapped_products(engine_ecom)
+        final_df = generate_savings_data_url(customers, product_mapped_data)
+
         final_df.to_csv('lost_cust.csv')
+        # create entry
+        #create_entry(final_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
 
 
 today = datetime.today().day
-if today not in [5, 20,18]:
+if today not in [5, 20]:
     logging()
     sys.exit()
 main()

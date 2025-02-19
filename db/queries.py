@@ -137,6 +137,17 @@ LOST_CUSTOMER_QUERY = '''
             AND c.last_purchase_bill_date + INTERVAL '3 months' < CURRENT_DATE);
     '''
 
+PRODUCT_MAPPED_DATA = '''
+    select 
+        ws_code,
+        id 
+    from products 
+    where 
+        is_banned is false 
+        and is_discontinued is false 
+        and content in ('TABLET','CAPSULE');
+'''
+
 def update_customer_campaign(successful_id):
     query = f'''
         UPDATE customer_campaigns
