@@ -137,6 +137,17 @@ LOST_CUSTOMER_QUERY = '''
             AND c.last_purchase_bill_date + INTERVAL '3 months' < CURRENT_DATE);
     '''
 
+PRODUCT_MAPPED_DATA = '''
+    select 
+        ws_code,
+        id 
+    from products 
+    where 
+        is_banned is false 
+        and is_discontinued is false 
+        and content in ('TABLET','CAPSULE');
+'''
+
 def update_customer_campaign(successful_id):
     query = f'''
         UPDATE customer_campaigns
@@ -145,6 +156,28 @@ def update_customer_campaign(successful_id):
         WHERE 
             is_message_sent IS false
             AND id IN ({successful_id});
+    '''
+
+    return query
+
+
+
+def get_customer_campaign_data(round):
+    query = f'''
+        select 
+            id, 
+            customer_mobile,
+            customer_code,
+            campaign_type, 
+            language, 
+            json_data, 
+            round,
+            campaign,
+            savings_url
+        from customer_campaigns 
+        where 
+            round = {round} 
+            and is_message_sent is false;
     '''
 
     return query
@@ -238,6 +271,17 @@ FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
             OR c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE
             OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
         ) 
+    '''
+
+INSERT_GIFT_VOUCHER_STORE_QUERY = '''
+    SELECT 
+        id 
+    FROM stores
+    WHERE 
+        store_type ='COCO' 
+        AND is_active= True 
+        AND is_pos_applicable = True 
+        AND id <>24 ; 
     '''
 
 

@@ -1,6 +1,6 @@
 import datetime
 from utils.logger import logger, logging
-from get_payload_function import get_payload_function
+from services.generate_payloads import get_payload_function
 from db.models import create_session, CampaignActivity, CustomerCampaigns
 import requests
 from sqlalchemy import text, func
@@ -40,35 +40,30 @@ def message_processer(row):
 
 def send_message(df):
     try:
-        # Start the session for database transactions
         session = create_session()
         for _ , row in df.iterrows():
-            # Prepare the payload for the campaign
 
             campaign_entry, payload = message_processer(row)
 
-            # Insert the entry into the database
             session.add(campaign_entry)
             session.commit()
 
             logger.info(f"Inserted campaign activity for {row['customer_mobile']}")
 
-            # Send the POST request
             response = requests.post(URLX, 
                                     headers={'Content-Type': 'application/json'},
                                     data=payload)
             
             logger.info(f"Response for {row['customer_mobile']}: {response.status_code}")
 
-            # Update the response and status based on the result
             successful_id = row['id']
 
             session.query(CustomerCampaigns).filter(
-                CustomerCampaigns.is_message_sent == False,  # Ensure to use `False` (not `false`)
+                CustomerCampaigns.is_message_sent == False,
                 CustomerCampaigns.id.in_(successful_id)
             ).update(
                 {"is_message_sent": True, "updated_at": func.now()},
-                synchronize_session=False  # Or use "fetch" if needed
+                synchronize_session=False
             )
 
             # session.execute(text(f'''UPDATE customer_campaigns
@@ -81,10 +76,7 @@ def send_message(df):
             campaign_entry.status = 'SUCCESS' if response.status_code == 200 else 'FAILED'
             campaign_entry.updated_at = datetime.now()
 
-            # Commit the changes to the database
             session.commit()
-
-            # Optional: Pause for a short time before processing the next row (for API rate limiting)
             time.sleep(0.1)
 
         logger.info("All messages sent and campaign entries updated successfully.")

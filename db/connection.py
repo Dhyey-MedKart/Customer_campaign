@@ -26,3 +26,4 @@ def get_db_engine_wms():
 
 engine_pos = create_engine(conn_string_read_pos())
 Session_pos = sessionmaker(bind=engine_pos)
+# session_pos = Session_mre()
