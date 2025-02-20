@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime,timedelta, date
 import sys
 from utils.logger import logging
 import numpy as np
@@ -168,6 +168,15 @@ def build_final_dataframe(customers, sales_data, reference_date):
         # Create JSON
         merged_df['json_data'] = merged_df.apply(generate_json_data, axis=1)
 
+        ## ADDING THE EXTRA JSON DATA 
+        merged_df['json_data'] = merged_df['json_data'].apply(lambda x: json.loads(x))
+        merged_df['json_data'] = merged_df['json_data'].apply(lambda x: {**x, **{
+            'voucher_code': generate_voucher_code(),
+            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+            'voucher_amount': VOUCHER_AMOUNT,
+            'minimum_order_value': MINIMUM_ORDER_VALUE
+        }})
+        
         # Select and rename columns
         result_df = merged_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']].copy()
         result_df.rename(columns={'mobile_number': 'customer_mobile'}, inplace=True)

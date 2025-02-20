@@ -1,5 +1,6 @@
 import json
 import numpy as np
+from datetime import date, timedelta
 import pandas as pd
 from utils.logger import logging
 from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
@@ -102,6 +103,16 @@ def merge_and_prepare_final_df(repeat_customers, processed_data):
             ['no_of_bills', 'ltv', 'loyalty_points', 'last_purchase_bill_date']
         ].astype(str)
         final_df['json_data'] = final_df.apply(generate_json_data, axis=1)
+
+        ### ADDING THE JSON DATA
+        final_df['json_data'] = final_df['json_data'].apply(lambda x: json.loads(x))
+        final_df['json_data'] = final_df['json_data'].apply(lambda x: {**x, **{
+            'voucher_code': generate_voucher_code(),
+            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+            'voucher_amount': VOUCHER_AMOUNT,
+            'minimum_order_value': MINIMUM_ORDER_VALUE
+        }})
+
         return final_df
     except Exception as e:
         logging()
@@ -146,6 +157,8 @@ def main():
 
     finally:
         session_pos.close()
+
+    
 
 # if __name__ == "__main__":
 
