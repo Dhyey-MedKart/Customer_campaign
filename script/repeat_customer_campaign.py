@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from utils.logger import logging
 from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
+from services.voucher_processing import generate_voucher_code, insert_gift_voucher_codes, insert_gift_voucher_stores, create_gift_voucher_summary
 from db.common_helper import get_data, create_entry
 from db.queries import (
     SALES_REPEAT_QUERY,
@@ -16,6 +17,10 @@ from services.customer_processing import (
     generate_json_data
 )
 from services.sales_processing import sales_processing
+
+
+VOUCHER_AMOUNT = 25
+MINIMUM_ORDER_VALUE = 500
 
 def initialize_engines():
     try:
@@ -115,21 +120,32 @@ def prepare_result_df(final_df):
 
 def main():
     try:
-        engine_pos, engine_mre, engine_wms, engine_ecom = initialize_engines()
+        engine_pos, engine_mre, engine_wms = initialize_engines()
         repeat_customers, repeat_customer_ids = fetch_repeat_customers(engine_pos)
         sales_data = fetch_sales_data(engine_pos, repeat_customer_ids)
         processed_data = process_data(engine_wms, sales_data)
         repeat_customers = assign_campaign_types(repeat_customers, processed_data)
         final_df = merge_and_prepare_final_df(repeat_customers, processed_data)
         result_df = prepare_result_df(final_df)
-        
-        # URL
-        product_mapped_data = load_mapped_products(engine_ecom)
-        result_df = generate_savings_data_url(result_df, product_mapped_data)
-
         create_entry(result_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
+
+    try:
+        session_pos = engine_pos.connect()
+        voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
+        insert_gift_voucher_codes(session_pos, result_df, voucher_id)
+        insert_gift_voucher_stores(session_pos, voucher_id)
+        # CREATE ENTRY
+        session_pos.commit()
+
+    except Exception as e:
+        logging()
+        session_pos.rollback()
+        return
+
+    finally:
+        session_pos.close()
 
 # if __name__ == "__main__":
 

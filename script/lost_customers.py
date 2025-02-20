@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
 from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
+from services.voucher_processing import generate_voucher_code, create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from db.common_helper import get_data, create_entry
 from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY, PRODUCT_MAPPED_DATA
 from services.customer_processing import (
@@ -15,6 +16,9 @@ from services.customer_processing import (
 from services.generate_savings_url import generate_savings_data_url
 from services.sales_processing import sales_processing
 
+
+VOUCHER_AMOUNT = 25
+MINIMUM_ORDER_VALUE = 500
 
 def initialize_engines():
     try:
@@ -201,6 +205,21 @@ def main():
     except Exception as e:
         logging()
 
+    try:
+        session_pos = engine_pos.connect()
+        voucher_id = create_gift_voucher_summary(session_pos, len(final_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
+        insert_gift_voucher_codes(session_pos, final_df.itertuples(), voucher_id)
+        insert_gift_voucher_stores(session_pos, voucher_id)
+        # CREATE ENTRY
+        session_pos.commit()
+
+    except Exception as e:
+        logging()
+        session_pos.rollback()
+        return
+
+    finally:
+        session_pos.close()
 
 today = datetime.today().day
 if today not in [5, 20]:
