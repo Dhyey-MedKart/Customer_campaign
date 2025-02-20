@@ -17,6 +17,8 @@ def create_entry(master,table_name,engine):
         logging()
         session.rollback()
         return False
+    finally:
+        session.close()
 
 def get_data(query,engine):
     try:

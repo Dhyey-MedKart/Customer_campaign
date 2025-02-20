@@ -1,15 +1,26 @@
-from db.connection import get_db_engine_pos,get_db_engine_mre
+from db.connection import get_db_engine_pos,get_db_engine_mre, Session_pos
 import pandas as pd
 from db.common_helper import get_data, create_entry
 from db.queries import FIRST_FIVE_BILLS_CUSTOMER_QUERY
 from services.customer_processing import convert_decimal
 from utils.logger import logger,logging
+from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
+from db.models import GiftVoucher
+
+from services.voucher_processing import generate_voucher_code
+from datetime import date, timedelta
 import json
 import numpy as np
+
+VOUCHER_AMOUNT = 1
+MINIMUM_ORDER_VALUE = 500
+
+
 def first_five_bills_campaign():
     try:
         engine = get_db_engine_pos()
         engine_mre = get_db_engine_mre()
+        first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
     except Exception as e:
         logging()
         return
@@ -32,7 +43,11 @@ def first_five_bills_campaign():
             'ltv': row['ltv'],
             'loyalty_points': row['loyalty_points'],
             'last_purchase_bill_date': row['last_purchase_bill_date'],
-            'free_gift':row['free_gift']
+            'free_gift':row['free_gift'],
+            'voucher_code': generate_voucher_code(),
+            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+            'voucher_amount': VOUCHER_AMOUNT,
+            'minimum_order_value': MINIMUM_ORDER_VALUE
         }, default=convert_decimal), axis=1)
         
         # Create the final DataFrame with 'mobile_number' and 'json_data'
@@ -44,9 +59,22 @@ def first_five_bills_campaign():
     
     except Exception as e:
         logging()
+        return 
+    
+    try:
+        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+    except Exception as e:
+        logging()
+        return
+    try:
+        session_pos = Session_pos()
+        voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+        insert_gift_voucher_codes(session_pos, result_df, voucher_id)
+        insert_gift_voucher_stores(session_pos, voucher_id)
 
-    # Insert the data into the database
-    create_entry(result_df, 'customer_campaigns', engine=engine_mre)
-
-
-    ## Generate voucher code
+    except Exception as e:
+        logging()
+        return
+    
+    finally:
+        session_pos.close()
