@@ -25,15 +25,12 @@ def first_five_bills_campaign():
         first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
     except Exception as e:
         logging()
-<<<<<<< HEAD
+
         return pd.DataFrame()
 
 
 def preprocess_data_first_five(first_five_bills):
     '''Function to preprocess the raw first five bills data and add the additional json to the data.'''
-=======
-        return
->>>>>>> af1e5c5dee769975ec164830c97a58add1750987
     try:
         # Converting the columns to string type
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].astype('str')
@@ -53,11 +50,7 @@ def preprocess_data_first_five(first_five_bills):
             'ltv': row['ltv'],
             'loyalty_points': row['loyalty_points'],
             'last_purchase_bill_date': row['last_purchase_bill_date'],
-            'free_gift':row['free_gift'],
-            'voucher_code': generate_voucher_code(),
-            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-            'voucher_amount': VOUCHER_AMOUNT,
-            'minimum_order_value': MINIMUM_ORDER_VALUE
+            'free_gift':row['free_gift']
         }, default=convert_decimal), axis=1)
 
     except Exception as e:
@@ -73,7 +66,17 @@ def store_results(first_five_bills):
         result_df = result_df.rename(columns={'mobile_number':'customer_mobile'})
         result_df = result_df[result_df['campaign_type']!='0']
         result_df['campaign'] = 'FIRST_FIVE_BILLS'
-        return result_df
+
+        result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = (
+            result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data']
+            .apply(lambda x: json.loads(x) if isinstance(x, str) else x)  # Ensure it's a dictionary
+            .apply(lambda x: {**x, **{
+                'voucher_code': generate_voucher_code(),
+                'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+                'voucher_amount': VOUCHER_AMOUNT,
+                'minimum_order_value': MINIMUM_ORDER_VALUE
+            }})
+        )
     
     except Exception as e:
         logging()
