@@ -1,4 +1,4 @@
-from db.connection import get_db_engine_pos,get_db_engine_mre, Session_pos
+from db.connection import get_db_engine_pos, Session_pos
 import pandas as pd
 from db.common_helper import get_data, create_entry
 from db.queries import FIRST_FIVE_BILLS_CUSTOMER_QUERY
@@ -19,7 +19,7 @@ MINIMUM_ORDER_VALUE = 500
 def first_five_bills_campaign():
     try:
         engine = get_db_engine_pos()
-        engine_mre = get_db_engine_mre()
+        #engine_mre = get_db_engine_mre()
         first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
     except Exception as e:
         logging()
@@ -62,16 +62,20 @@ def first_five_bills_campaign():
         return 
     
     try:
-        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+        #create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+        result_df.to_csv('first_five_bills.csv')
     except Exception as e:
         logging()
         return
+
     try:
         session_pos = Session_pos()
-        voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
-        insert_gift_voucher_codes(session_pos, result_df, voucher_id)
-        insert_gift_voucher_stores(session_pos, voucher_id)
-
+        if not result_df.empty:
+            voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+            insert_gift_voucher_codes(session_pos, result_df, voucher_id)
+            insert_gift_voucher_stores(session_pos, voucher_id)
+        else:
+            logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
     except Exception as e:
         logging()
         return

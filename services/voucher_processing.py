@@ -1,4 +1,7 @@
-from db.models import GiftVoucher, CustomerCampaigns, GiftVoucherCode, GiftVoucherApplicableStore
+from db.models import GiftVoucher
+from db.models import CustomerCampaigns
+from db.models import GiftVoucherCode
+from db.models import GiftVoucherApplicableStore
 from datetime import date, timedelta
 from db.common_helper import get_data
 from db.connection import get_db_engine_pos
@@ -8,9 +11,11 @@ from sqlalchemy.orm.attributes import flag_modified
 import json
 import random
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-logger = logging.getLogger('my_logger')
-logging.basicConfig(filename='logging.log', filemode='w', level=logging.INFO)
+load_dotenv()
+ADMIN_USER = os.getenv('ADMIN_USER')
 
 def generate_voucher_code():
     year = datetime.now().strftime('%y')
@@ -28,7 +33,7 @@ def create_gift_voucher_summary(session_pos, customer_count,voucher_amount,campa
         applicable_type='COCO',
         is_expired=False,
         is_active=True,
-        created_by=547,
+        created_by=ADMIN_USER,
         is_minimum_order_value_applicable=True,
         minimum_order_value=minimum_order_value
     )
@@ -38,14 +43,15 @@ def create_gift_voucher_summary(session_pos, customer_count,voucher_amount,campa
 
 
 def insert_gift_voucher_codes(session_pos, customers, voucher_id):
-    for customer in customers:
+
+    for _,customer in customers.iterrows():
         gift_voucher_entry = GiftVoucherCode(
             gift_voucher_id=voucher_id,
-            voucher_code=customer.json_data['voucher_code'],
-            voucher_amount=customer.json_data['voucher_amount'],
+            voucher_code=customer['json_data']['voucher_code'],
+            voucher_amount=customer['json_data']['voucher_amount'],
             expired_at=date.today() + timedelta(8),
-            minimum_order_value=customer.json_data['minimum_order_value'],
-            created_by=547
+            minimum_order_value=customer['json_data']['minimum_order_value'],
+            created_by=ADMIN_USER
         )
         session_pos.add(gift_voucher_entry)
 
@@ -58,6 +64,6 @@ def insert_gift_voucher_stores(session_pos, voucher_id):
         store_entry = GiftVoucherApplicableStore(
             gift_voucher_id=int(voucher_id),
             store_id=int(store_id),
-            created_by=547
+            created_by=ADMIN_USER
         )
         session_pos.add(store_entry)

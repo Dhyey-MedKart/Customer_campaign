@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, Boolean,Float,DateTime,Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from config.settings import conn_string_ecom,conn_string_mre,conn_string_read_pos
+from config.settings import conn_string_ecom,conn_string_read_pos
 
 Base = declarative_base()
 
@@ -47,8 +47,8 @@ class CampaignActivity(Base):
 
 
 # Database connection and session
-engine_mre = create_engine(conn_string_mre())
-Base.metadata.create_all(bind=engine_mre)
+# engine_mre = create_engine(conn_string_mre())
+# Base.metadata.create_all(bind=engine_mre)
 
 
 
@@ -110,13 +110,13 @@ class GiftVoucherCode(Base):
     assigned_at_store_id = Column(Integer, nullable=True)
     assigned_at_draft_id = Column(Integer, nullable=True)
 
-class CompareSavings(Base):
-    __tablename__ = 'compare_savings'
+# class CompareSavings(Base):
+#     __tablename__ = 'compare_savings'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    medicine_ids = Column(String, nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    deleted_at = Column(DateTime, nullable=True)
+#     id = Column(Integer, primary_key=True, autoincrement=True)
+#     medicine_ids = Column(String, nullable=False)
+#     created_at = Column(DateTime, nullable=False)
+#     deleted_at = Column(DateTime, nullable=True)
 
 class GiftVoucherApplicableStore(Base):
     __tablename__ = "gift_voucher_applicable_stores"

@@ -32,3 +32,11 @@ def get_data(query,engine):
     except Exception as e:
        logging()
        return False
+
+
+def encrypt_id(ID):
+    if ID and ID is not None and ID != '' and isinstance(ID, (int, float)):
+        encrypted = (((((((((ID * 11) + 758946213) * 17) + 945876123) * 13) - 157823649) * 7) - 283549167) * 3)
+        return encrypted
+    else:
+        return None

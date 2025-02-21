@@ -5,7 +5,7 @@ from utils.logger import logging
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
-from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
+from db.connection import get_db_engine_pos, get_db_engine_wms, get_db_engine_ecom,Session_pos
 from services.voucher_processing import generate_voucher_code, create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from db.common_helper import get_data, create_entry
 from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY, PRODUCT_MAPPED_DATA
@@ -20,12 +20,12 @@ from services.sales_processing import sales_processing
 VOUCHER_AMOUNT = 25
 MINIMUM_ORDER_VALUE = 500
 
-def initialize_engines():
-    try:
-        return get_db_engine_pos(), get_db_engine_mre(), get_db_engine_wms(), get_db_engine_ecom()
-    except Exception as e:
-        logging()
-        raise
+# def initialize_engines():
+#     try:
+#         return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom()
+#     except Exception as e:
+#         logging()
+#         raise
 
 
 def load_customers(engine):
@@ -103,6 +103,8 @@ def load_sales_data(engine, customer_ids, reference_date):
     """
     Retrieve the sales data for the given customer IDs and reference date.
     """
+    if not customer_ids:
+        raise ValueError("customer_ids cannot be empty!")
     try:
         query = get_lost_customer_sales_query(customer_ids=tuple(customer_ids), reference_date=reference_date)
         sales_data = get_data(query, engine)
@@ -117,6 +119,7 @@ def process_sales_data(assured_mapping, sales_data):
     """
     try:
         processed_data = customer_branded_chronic_purchase(assured_mapping=assured_mapping, sales=sales_data)
+        
         processed_data = sales_processing(processed_data)
         return processed_data
     except Exception as e:
@@ -191,11 +194,14 @@ def build_final_dataframe(customers, sales_data, reference_date):
 
 def main():
     try:
-        engine_pos, engine_mre, engine_wms, engine_ecom = initialize_engines()
+        engine_pos = get_db_engine_pos()
+        engine_wms = get_db_engine_wms()
+        engine_ecom = get_db_engine_ecom()
         customers = load_customers(engine_pos)
         today = datetime.today()
         reference_date = compute_reference_date(today)
         customers['reference_date'] = reference_date
+        
         customers = apply_campaign_category(customers, reference_date, campaign_name='LOST_CUSTOMER')
         m3_customer_ids = customers[customers['category'] == 'M3']['customer_id'].tolist()
         sales_data = load_sales_data(engine_pos, m3_customer_ids, reference_date)
@@ -203,25 +209,24 @@ def main():
         processed_sales = process_sales_data(assured_mapping, sales_data)
         customers = assign_campaign_types(customers, processed_sales)
         final_df = build_final_dataframe(customers, processed_sales, reference_date)
-
+        
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
         final_df = generate_savings_data_url(final_df, product_mapped_data)
-
         final_df.to_csv('lost_cust.csv')
         # create entry
-        #create_entry(final_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
 
     try:
-        session_pos = engine_pos.connect()
+        session_pos = Session_pos()
         voucher_id = create_gift_voucher_summary(session_pos, len(final_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
-        insert_gift_voucher_codes(session_pos, final_df.itertuples(), voucher_id)
+        insert_gift_voucher_codes(session_pos, final_df, voucher_id)
         insert_gift_voucher_stores(session_pos, voucher_id)
         # CREATE ENTRY
         session_pos.commit()
-
+        # XYZ
+        #create_entry(final_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
         session_pos.rollback()
