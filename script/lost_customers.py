@@ -219,11 +219,13 @@ def main():
         final_df.to_csv('lost_cust.csv')
         # create entry
     except Exception as e:
+        
         logging()
 
     try:
         session_pos = Session_pos()
         voucher_customers = final_df[final_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
+        
         if not voucher_customers.empty:
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
             voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)

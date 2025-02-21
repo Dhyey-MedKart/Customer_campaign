@@ -12,7 +12,7 @@ from db.models import CompareSavings
 from db.connection import Session_ecom
 
 
-def generate_link(customer, pos_product_master_dict):
+def generate_link(customer: dict, pos_product_master_dict: dict):
     """
     Generate and store savings link for a customer.
 
@@ -26,33 +26,34 @@ def generate_link(customer, pos_product_master_dict):
     session_ecom = Session_ecom()
 
     try:
-        # Convert `subs_products` to DataFrame
-        json_data = pd.DataFrame(customer['json_data']['subs_products'])
+        json_data = json.loads(customer['json_data']) if isinstance(customer['json_data'], str) else customer['json_data']
 
-        if 'bc_product_code' in json_data.columns:
-            json_data['pos_product_id'] = json_data['bc_product_code'].map(pos_product_master_dict)
-            json_data['encrypt_id'] = json_data['pos_product_id'].apply(lambda x: encrypt_id(x) if pd.notna(x) else None)
-        else:
-            raise KeyError("Column 'bc_product_code' not found in json_data.")
+        subs_products = json_data.get('subs_products', [])
+        if not isinstance(subs_products, list) or not subs_products:
+            raise ValueError("Invalid or empty 'subs_products' in json_data")
 
-        # Generate savings entry in CompareSavings
+        subs_df = pd.DataFrame(subs_products)
+
+        if 'bc_product_code' not in subs_df.columns:
+            raise KeyError("Column 'bc_product_code' not found in subs_products.")
+
+        subs_df['pos_product_id'] = subs_df['bc_product_code'].map(pos_product_master_dict)
+        subs_df['encrypt_id'] = subs_df['pos_product_id'].apply(lambda x: encrypt_id(x) if pd.notna(x) else None)
+
         savings = CompareSavings(
-            medicine_ids=str(list(np.unique(json_data['encrypt_id']))),  # Fix list formatting
+            medicine_ids=str(list(np.unique(subs_df['encrypt_id']))), 
             created_at=datetime.now(),
         )
 
         session_ecom.add(savings)
-        session_ecom.flush()  # Ensure `savings.id` is generated
+        session_ecom.flush() 
 
-        # Update customer data with savings URL
-        customer_data = customer.copy()  # Copy dictionary to avoid modifying the original
-        savings_url = f"https://www.medkart.in/savings/{encrypt_id(savings.id)}"
-        customer_data['savings_url'] = savings_url  # Directly add savings_url
+        customer_copy = customer.copy()  
+        customer_copy['savings_url'] = f"https://www.medkart.in/savings/{encrypt_id(savings.id)}"
 
         session_ecom.commit()
 
-        # ✅ Fix: Convert to DataFrame properly
-        return pd.DataFrame([customer_data])
+        return pd.DataFrame([customer_copy])
 
     except Exception as e:
         session_ecom.rollback()
