@@ -24,7 +24,6 @@ def first_five_bills_campaign():
     except Exception as e:
         logging()
         return
-    first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
     try:
         # Converting the columns to string type
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].astype('str')
@@ -70,9 +69,11 @@ def first_five_bills_campaign():
 
     try:
         session_pos = Session_pos()
-        if not result_df.empty:
-            voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
-            insert_gift_voucher_codes(session_pos, result_df, voucher_id)
+        voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
+        if not voucher_customers.empty:
+            voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
+            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+            insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
             insert_gift_voucher_stores(session_pos, voucher_id)
         else:
             logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
