@@ -186,7 +186,6 @@ def get_lost_customer_sales_query(customer_ids: tuple = (-1,), reference_date: d
 
     if reference_date is None:
         reference_date = datetime.datetime.today().date()
-
     query = f"""
         SELECT
             si.store_id,

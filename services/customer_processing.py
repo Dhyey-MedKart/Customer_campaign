@@ -29,10 +29,10 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
         
         assured_products = assured_mapping['a_product_code'].unique()
         assured_mapping_dict = dict(zip(assured_mapping['bc_product_code'], assured_mapping['a_product_code']))
-        
         sales = sales[sales['product_code'].isin(all_products)]
-
+        
         filtered_sales_list = []
+        # 1039
         for customer, group in sales.groupby('customer_id'):
             customer_products = group['product_code'].tolist()
             bought_assured = [product for product in customer_products if product in assured_products]
@@ -44,22 +44,26 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
                 filtered_sales = group
 
             filtered_sales_list.append(filtered_sales)
+            
+        # If sales are found for a customer
+        if filtered_sales_list:  
+            data = pd.concat(filtered_sales_list)
+            data1 = data.merge(required_cols_ass_mapping, left_on='product_code', right_on='bc_product_code').drop('product_code', axis=1)
+            data1['savings'] = ((data1['bc_sales_price'] / data1['bc_package_size']) -
+                                (data1['a_sales_price'] / data1['a_package_size'])) * 30
+            data1['savings'] = np.round(data1['savings'].astype('float64'), 0)
+            data1 = data1.sort_values(by='savings', ascending=False)
 
-        data = pd.concat(filtered_sales_list)
-        data1 = data.merge(required_cols_ass_mapping, left_on='product_code', right_on='bc_product_code').drop('product_code', axis=1)
-        data1['savings'] = ((data1['bc_sales_price'] / data1['bc_package_size']) -
-                             (data1['a_sales_price'] / data1['a_package_size'])) * 30
-        data1['savings'] = np.round(data1['savings'].astype('float64'), 0)
-        data1 = data1.sort_values(by='savings', ascending=False)
-
-        counts_data = data1.groupby(['customer_id']).agg({'savings': 'sum', 'bc_product_name': 'nunique'}).reset_index()
-        counts_data = counts_data.rename(columns={'bc_product_name': 'alternate_count', 'savings': 'total_savings'})
-        
-        data1 = data1.drop_duplicates(subset=['customer_id', 'bc_product_code'])
-        data1 = data1[['store_id', 'billdate', 'customer_id', 'bc_product_code', 'bc_product_name', 'bc_sales_price',
-                       'a_product_code', 'a_product_name', 'bc_mrp', 'a_sales_price', 'savings']]
-        data2 = data1.merge(counts_data, on='customer_id')
-        return data2
+            counts_data = data1.groupby(['customer_id']).agg({'savings': 'sum', 'bc_product_name': 'nunique'}).reset_index()
+            counts_data = counts_data.rename(columns={'bc_product_name': 'alternate_count', 'savings': 'total_savings'})
+            
+            data1 = data1.drop_duplicates(subset=['customer_id', 'bc_product_code'])
+            data1 = data1[['store_id', 'billdate', 'customer_id', 'bc_product_code', 'bc_product_name', 'bc_sales_price',
+                        'a_product_code', 'a_product_name', 'bc_mrp', 'a_sales_price', 'savings']]
+            data2 = data1.merge(counts_data, on='customer_id')
+            return data2
+        print("Out")
+        return pd.DataFrame()
     
     except (KeyError, ValueError, TypeError) as e:
         logging()

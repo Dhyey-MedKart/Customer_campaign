@@ -3,7 +3,7 @@ import numpy as np
 from datetime import date, timedelta
 import pandas as pd
 from utils.logger import logging
-from db.connection import get_db_engine_pos, get_db_engine_mre, get_db_engine_wms, get_db_engine_ecom
+from db.connection import get_db_engine_pos, get_db_engine_wms,Session_pos
 from services.voucher_processing import generate_voucher_code, insert_gift_voucher_codes, insert_gift_voucher_stores, create_gift_voucher_summary
 from db.common_helper import get_data, create_entry
 from datetime import date, timedelta
@@ -31,7 +31,7 @@ MINIMUM_ORDER_VALUE = 500
 
 def initialize_engines():
     try:
-        return get_db_engine_pos(), get_db_engine_mre(), get_db_engine_wms(), get_db_engine_ecom()
+        return get_db_engine_pos(), get_db_engine_wms()
     except Exception as e:
         logging()
         raise
@@ -111,13 +111,17 @@ def merge_and_prepare_final_df(repeat_customers, processed_data):
         final_df['json_data'] = final_df.apply(generate_json_data, axis=1)
 
         ### ADDING THE JSON DATA
-        final_df['json_data'] = final_df['json_data'].apply(lambda x: json.loads(x))
-        final_df['json_data'] = final_df['json_data'].apply(lambda x: {**x, **{
-            'voucher_code': generate_voucher_code(),
-            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-            'voucher_amount': VOUCHER_AMOUNT,
-            'minimum_order_value': MINIMUM_ORDER_VALUE
-        }})
+        
+        final_df.loc[final_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = (
+            final_df.loc[final_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data']
+            .apply(lambda x: json.loads(x) if isinstance(x, str) else x)  # Ensure it's a dictionary
+            .apply(lambda x: {**x, **{
+                'voucher_code': generate_voucher_code(),
+                'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+                'voucher_amount': VOUCHER_AMOUNT,
+                'minimum_order_value': MINIMUM_ORDER_VALUE
+            }})
+        )
 
         return final_df
     except Exception as e:
@@ -137,25 +141,28 @@ def prepare_result_df(final_df):
 
 def main():
     try:
-        engine_pos, engine_mre, engine_wms = initialize_engines()
+        engine_pos, engine_wms = initialize_engines()
         repeat_customers, repeat_customer_ids = fetch_repeat_customers(engine_pos)
         sales_data = fetch_sales_data(engine_pos, repeat_customer_ids)
         processed_data = process_data(engine_wms, sales_data)
         repeat_customers = assign_campaign_types(repeat_customers, processed_data)
         final_df = merge_and_prepare_final_df(repeat_customers, processed_data)
         result_df = prepare_result_df(final_df)
-        create_entry(result_df, 'customer_campaigns', engine_mre)
+        result_df.to_csv('repeat_customers.csv')
     except Exception as e:
         logging()
 
     try:
-        session_pos = engine_pos.connect()
-        voucher_id = create_gift_voucher_summary(session_pos, len(result_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
-        insert_gift_voucher_codes(session_pos, result_df, voucher_id)
-        insert_gift_voucher_stores(session_pos, voucher_id)
+        session_pos = Session_pos()
+        voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
+        if not voucher_customers.empty:
+            voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
+            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+            insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
+            insert_gift_voucher_stores(session_pos, voucher_id)
         # CREATE ENTRY
         session_pos.commit()
-
+        #create_entry(result_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
         session_pos.rollback()

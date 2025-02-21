@@ -270,7 +270,7 @@ def get_payload_function(campaign_name):
         "REPEAT_OTH_R1_ENG": get_repeat_oth_r1_eng_payload,
         "REPEAT_OTH_R2_HIN": get_repeat_oth_r2_hin_payload,
         "REPEAT_OTH_R2_GUJ": get_repeat_oth_r2_guj_payload,
-        "REPEAT_MSP_R1_ENG_v2": get_repeat_msp_r1_eng_payload,
+        "REPEAT_MSP_R1_ENG_v2": get_repeat_msp_r1_eng_payload, 
         "REPEAT_MSP_R2_HIN_v1": get_repeat_msp_r2_hin_payload,
         "REPEAT_MSP_R2_GUJ_v1": get_repeat_msp_r2_guj_payload,
         "OFFER_CAMPAIGN_AUTO_MKT": get_first5_msp_invite_r1_eng_payload,
