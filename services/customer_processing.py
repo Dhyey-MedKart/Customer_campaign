@@ -34,7 +34,6 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
         filtered_sales_list = []
         # 1039
         for customer, group in sales.groupby('customer_id'):
-            print(customer, group)
             customer_products = group['product_code'].tolist()
             bought_assured = [product for product in customer_products if product in assured_products]
             
@@ -48,7 +47,6 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
             
         # If sales are found for a customer
         if filtered_sales_list:  
-            print("In")
             data = pd.concat(filtered_sales_list)
             data1 = data.merge(required_cols_ass_mapping, left_on='product_code', right_on='bc_product_code').drop('product_code', axis=1)
             data1['savings'] = ((data1['bc_sales_price'] / data1['bc_package_size']) -

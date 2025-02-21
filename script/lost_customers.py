@@ -172,13 +172,16 @@ def build_final_dataframe(customers, sales_data, reference_date):
         merged_df['json_data'] = merged_df.apply(generate_json_data, axis=1)
 
         ## ADDING THE EXTRA JSON DATA 
-        merged_df['json_data'] = merged_df['json_data'].apply(lambda x: json.loads(x))
-        merged_df['json_data'] = merged_df['json_data'].apply(lambda x: {**x, **{
-            'voucher_code': generate_voucher_code(),
-            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-            'voucher_amount': VOUCHER_AMOUNT,
-            'minimum_order_value': MINIMUM_ORDER_VALUE
-        }})
+        merged_df.loc[merged_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = (
+            merged_df.loc[merged_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data']
+            .apply(lambda x: json.loads(x) if isinstance(x, str) else x)  # Ensure it's a dictionary
+            .apply(lambda x: {**x, **{
+                'voucher_code': generate_voucher_code(),
+                'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+                'voucher_amount': VOUCHER_AMOUNT,
+                'minimum_order_value': MINIMUM_ORDER_VALUE
+            }})
+        )
         
         # Select and rename columns
         result_df = merged_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']].copy()
@@ -220,9 +223,12 @@ def main():
 
     try:
         session_pos = Session_pos()
-        voucher_id = create_gift_voucher_summary(session_pos, len(final_df), VOUCHER_AMOUNT, '25_RUPEES', MINIMUM_ORDER_VALUE)
-        insert_gift_voucher_codes(session_pos, final_df, voucher_id)
-        insert_gift_voucher_stores(session_pos, voucher_id)
+        voucher_customers = final_df[final_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
+        if not voucher_customers.empty:
+            voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
+            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+            insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
+            insert_gift_voucher_stores(session_pos, voucher_id)
         # CREATE ENTRY
         session_pos.commit()
         # XYZ
@@ -236,7 +242,7 @@ def main():
         session_pos.close()
 
 today = datetime.today().day
-if today not in [5, 20]:
+if today not in [5, 20,21]:
     logging()
     sys.exit()
 main()
