@@ -12,7 +12,6 @@ load_dotenv()
 
 URLX = os.getenv('MSG_POST_URL')    
 
-
 def message_processer(row):
     payload_function = get_payload_function(row['campaign_name'])
     if payload_function:
@@ -20,7 +19,6 @@ def message_processer(row):
     else:
         logger.warning(f"No payload function found for campaign: {row['campaign_name']}")
 
-    # Prepare the campaign activity entry
     campaign_entry = CampaignActivity(
         customer_code=row['customer_code'],
         sub_campaign_name=row['campaign_name'],

@@ -5,7 +5,7 @@ from utils.logger import logging
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
-from db.connection import get_db_engine_pos, get_db_engine_wms, get_db_engine_ecom,Session_pos
+from db.connection import get_db_engine_pos, get_db_engine_wms, get_db_engine_ecom,get_db_engine_mre,Session_pos
 from services.voucher_processing import generate_voucher_code, create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from db.common_helper import get_data, create_entry
 from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY, PRODUCT_MAPPED_DATA
@@ -200,6 +200,7 @@ def main():
         engine_pos = get_db_engine_pos()
         engine_wms = get_db_engine_wms()
         engine_ecom = get_db_engine_ecom()
+        engine_mre = get_db_engine_mre()
         customers = load_customers(engine_pos)
         today = datetime.today()
         reference_date = compute_reference_date(today)
@@ -216,7 +217,7 @@ def main():
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
         final_df = generate_savings_data_url(final_df, product_mapped_data)
-        final_df.to_csv('lost_cust.csv')
+        # final_df.to_csv('lost_cust.csv')
         # create entry
     except Exception as e:
         
@@ -234,7 +235,7 @@ def main():
         # CREATE ENTRY
         session_pos.commit()
         # XYZ
-        #create_entry(final_df, 'customer_campaigns', engine_mre)
+        create_entry(final_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
         session_pos.rollback()

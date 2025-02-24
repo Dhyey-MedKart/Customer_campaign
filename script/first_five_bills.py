@@ -1,4 +1,4 @@
-from db.connection import get_db_engine_pos, Session_pos
+from db.connection import get_db_engine_pos, Session_pos, get_db_engine_mre
 import pandas as pd
 from db.common_helper import get_data, create_entry
 from db.queries import FIRST_FIVE_BILLS_CUSTOMER_QUERY
@@ -19,7 +19,6 @@ MINIMUM_ORDER_VALUE = 500
 def first_five_bills_campaign():
     try:
         engine = get_db_engine_pos()
-        #engine_mre = get_db_engine_mre()
         first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
         return first_five_bills
     except Exception as e:
@@ -80,16 +79,10 @@ def store_results(first_five_bills):
     except Exception as e:
         logging()
         return 
-    
-    try:
-        #create_entry(result_df, 'customer_campaigns', engine=engine_mre)
-        result_df.to_csv('first_five_bills.csv')
-    except Exception as e:
-        logging()
-        return
 
     try:
         session_pos = Session_pos()
+        engine_mre = get_db_engine_mre()
         voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
         if not voucher_customers.empty:
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
@@ -98,7 +91,7 @@ def store_results(first_five_bills):
             insert_gift_voucher_stores(session_pos, voucher_id)
         else:
             logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
-        
+        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
         session_pos.commit()
     except Exception as e:
         session_pos.rollback()

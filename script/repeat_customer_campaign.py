@@ -3,7 +3,7 @@ import numpy as np
 from datetime import date, timedelta
 import pandas as pd
 from utils.logger import logging
-from db.connection import get_db_engine_pos, get_db_engine_wms,Session_pos,get_db_engine_ecom
+from db.connection import get_db_engine_pos, get_db_engine_wms,Session_pos,get_db_engine_ecom, get_db_engine_mre
 from services.voucher_processing import generate_voucher_code, insert_gift_voucher_codes, insert_gift_voucher_stores, create_gift_voucher_summary
 from db.common_helper import get_data, create_entry
 from db.queries import (
@@ -25,7 +25,7 @@ MINIMUM_ORDER_VALUE = 500
 
 def initialize_engines():
     try:
-        return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom()
+        return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom(), get_db_engine_mre()
     except Exception as e:
         logging()
         raise
@@ -135,7 +135,7 @@ def prepare_result_df(final_df):
 
 def main():
     try:
-        engine_pos, engine_wms,engine_ecom = initialize_engines()
+        engine_pos, engine_wms,engine_ecom,engine_mre = initialize_engines()
         repeat_customers, repeat_customer_ids = fetch_repeat_customers(engine_pos)
         sales_data = fetch_sales_data(engine_pos, repeat_customer_ids)
         processed_data = process_data(engine_wms, sales_data)
@@ -144,7 +144,7 @@ def main():
         result_df = prepare_result_df(final_df)
         product_mapped_data = load_mapped_products(engine_ecom)
         result_df = generate_savings_data_url(result_df, product_mapped_data)
-        result_df.to_csv('repeat_customers.csv')
+        # result_df.to_csv('repeat_customers.csv')
     except Exception as e:
         logging()
 
@@ -157,8 +157,8 @@ def main():
             insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
             insert_gift_voucher_stores(session_pos, voucher_id)
         # CREATE ENTRY
+        create_entry(result_df, 'customer_campaigns', engine_mre)
         session_pos.commit()
-        #create_entry(result_df, 'customer_campaigns', engine_mre)
     except Exception as e:
         logging()
         session_pos.rollback()
