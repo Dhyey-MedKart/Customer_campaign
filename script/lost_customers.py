@@ -1,11 +1,12 @@
 import json
 from datetime import datetime,timedelta, date
 import sys
-from utils.logger import logging
+from utils.logger import logging, logger
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
-from db.connection import get_db_engine_pos, get_db_engine_wms, get_db_engine_ecom,get_db_engine_mre,Session_pos
+from db.connection import get_db_engine_pos, get_db_engine_wms, get_db_engine_ecom,get_db_engine_mre
+from db.models_pos import create_session_pos
 from services.voucher_processing import generate_voucher_code, create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from db.common_helper import get_data, create_entry
 from db.queries import LOST_CUSTOMER_QUERY, get_lost_customer_sales_query, ASSURED_QUERY, PRODUCT_MAPPED_DATA
@@ -17,42 +18,28 @@ from services.generate_savings_url import generate_savings_data_url
 from services.sales_processing import sales_processing
 
 
-VOUCHER_AMOUNT = 25
-MINIMUM_ORDER_VALUE = 500
+campaign_values = {
+    '25_RUPEES': {'voucher_amount': 25,
+                  'minimum_order_value': 500},
+                  
+    'FREE_OTC': {'voucher_amount': 1,
+                 'minimum_order_value': 500}
+}
 
-# def initialize_engines():
-#     try:
-#         return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom()
-#     except Exception as e:
-#         logging()
-#         raise
-
+def initialize_engines():
+    try:
+        return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom(), get_db_engine_mre()
+    except Exception as e:
+        logging()
+        raise
 
 def load_customers(engine):
     """
     Load repeat customers from the database and convert the date column.
     """
-    try:
-        customers = get_data(LOST_CUSTOMER_QUERY, engine)
-        customers['last_purchase_bill_date'] = pd.to_datetime(customers['last_purchase_bill_date'])
-        return customers
-    except Exception as e:
-        logging()
-        return pd.DataFrame()
-
-def load_mapped_products(engine):
-    """
-    Load repeat customers from the database and convert the date column.
-    """
-    try:
-        products = get_data(PRODUCT_MAPPED_DATA, engine)
-        prod_mapping = dict(zip(products['ws_code'], products['id']))
-        return prod_mapping
-    except Exception as e:
-        logging()
-        return {}
-
-
+    customers = get_data(LOST_CUSTOMER_QUERY, engine)
+    customers['last_purchase_bill_date'] = pd.to_datetime(customers['last_purchase_bill_date'])
+    return customers
 
 def compute_reference_date(today):
     """
@@ -103,15 +90,10 @@ def load_sales_data(engine, customer_ids, reference_date):
     """
     Retrieve the sales data for the given customer IDs and reference date.
     """
-    if not customer_ids:
-        raise ValueError("customer_ids cannot be empty!")
-    try:
-        query = get_lost_customer_sales_query(customer_ids=tuple(customer_ids), reference_date=reference_date)
-        sales_data = get_data(query, engine)
-        return sales_data
-    except Exception as e:
-        logging()
-        return pd.DataFrame()
+    query = get_lost_customer_sales_query(customer_ids=tuple(customer_ids), reference_date=reference_date)
+    sales_data = get_data(query, engine)
+    return sales_data
+
 
 def process_sales_data(assured_mapping, sales_data):
     """
@@ -154,7 +136,7 @@ def assign_campaign_types(customers, sales_data):
         return pd.DataFrame()
 
 
-def build_final_dataframe(customers, sales_data, reference_date):
+def build_final_dataframe(customers, sales_data):
     """
     Merge customer and sales data, transform fields, and prepare the final result DataFrame.
     """
@@ -178,12 +160,11 @@ def build_final_dataframe(customers, sales_data, reference_date):
             .apply(lambda x: {**x, **{
                 'voucher_code': generate_voucher_code(),
                 'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-                'voucher_amount': VOUCHER_AMOUNT,
-                'minimum_order_value': MINIMUM_ORDER_VALUE
+                'voucher_amount': campaign_values[x.get('campaign_type', '')]['voucher_amount'],
+                'minimum_order_value': campaign_values[x.get('campaign_type', '')]['minimum_order_value']
             }})
         )
         
-        # Select and rename columns
         result_df = merged_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']].copy()
         result_df.rename(columns={'mobile_number': 'customer_mobile'}, inplace=True)
 
@@ -195,12 +176,23 @@ def build_final_dataframe(customers, sales_data, reference_date):
         logging()
         return pd.DataFrame()
 
+def load_mapped_products(engine):
+    """
+    Load repeat customers from the database and convert the date column.
+    """
+    try:
+        products = get_data(PRODUCT_MAPPED_DATA, engine)
+        if products.empty():
+            raise ValueError("No product mapping data")
+        prod_mapping = dict(zip(products['ws_code'], products['id']))
+        return prod_mapping
+    except Exception as e:
+        logging()
+        return {}
+
 def main():
     try:
-        engine_pos = get_db_engine_pos()
-        engine_wms = get_db_engine_wms()
-        engine_ecom = get_db_engine_ecom()
-        engine_mre = get_db_engine_mre()
+        engine_pos, engine_wms, engine_ecom, engine_mre = initialize_engines()
         customers = load_customers(engine_pos)
         today = datetime.today()
         reference_date = compute_reference_date(today)
@@ -212,24 +204,23 @@ def main():
         assured_mapping = get_data(ASSURED_QUERY, engine_wms)
         processed_sales = process_sales_data(assured_mapping, sales_data)
         customers = assign_campaign_types(customers, processed_sales)
-        final_df = build_final_dataframe(customers, processed_sales, reference_date)
+        final_df = build_final_dataframe(customers, processed_sales)
         
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
         final_df = generate_savings_data_url(final_df, product_mapped_data)
         # final_df.to_csv('lost_cust.csv')
-        # create entry
     except Exception as e:
         
         logging()
 
     try:
-        session_pos = Session_pos()
+        session_pos = create_session_pos()
         voucher_customers = final_df[final_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
         
         if not voucher_customers.empty:
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), 'FREE_OTC')
             insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
             insert_gift_voucher_stores(session_pos, voucher_id)
         # CREATE ENTRY
@@ -245,9 +236,10 @@ def main():
         session_pos.close()
 
 today = datetime.today().day
-if today not in [5, 20,21]:
+if today not in [5, 20]:
     logging()
     sys.exit()
 main()
-
+print(f'Succesfully executed Lost_customers at {datetime.now()}')
+logger.info(f'Succesfully executed Lost_customers at {datetime.now()}')
 

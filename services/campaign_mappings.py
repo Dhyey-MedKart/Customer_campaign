@@ -87,7 +87,7 @@ campaign_mapping = {
     }
 }
 
-# Add new campaign column based on round and campaign type
+
 def map_campaign(df, input_round):
     def get_campaign_name(row):
         campaign_type = row['campaign'].lower()

@@ -21,12 +21,7 @@ def sales_processing(data):
         ])).reset_index().rename(columns={0: 'products'})
 
         return grouped_data
-    except KeyError as e:
-        logging()
-        return pd.DataFrame()
-    except ValueError as e:
-        logging()
-        return pd.DataFrame()
+
     except Exception as e:
         logging()
         return pd.DataFrame()

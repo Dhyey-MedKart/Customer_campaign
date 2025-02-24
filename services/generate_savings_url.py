@@ -8,8 +8,8 @@ from uuid import uuid4  # Generate unique savings ID
 
 from db.common_helper import encrypt_id
 from utils.logger import logger  # Remove duplicate logging import
-from db.models import CompareSavings
-from db.connection import Session_ecom
+from db.models_ecom import CompareSavings
+from db.connection import create_session_ecom
 
 
 def generate_link(customer: dict, pos_product_master_dict: dict):
@@ -23,7 +23,7 @@ def generate_link(customer: dict, pos_product_master_dict: dict):
     Returns:
         pd.DataFrame: Updated customer data with `savings_url`.
     """
-    session_ecom = Session_ecom()
+    session_ecom = create_session_ecom()
 
     try:
         json_data = json.loads(customer['json_data']) if isinstance(customer['json_data'], str) else customer['json_data']

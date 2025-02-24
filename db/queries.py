@@ -96,7 +96,8 @@ REPEAT_CUSTOMER_QUERY = '''
             OR c.last_purchase_bill_date + INTERVAL '87 days' = CURRENT_DATE);
     '''
 
-SALES_REPEAT_QUERY = '''
+def get_repeat_sales(customer_id):
+    query = f'''
     SELECT
         si.store_id,
         TO_CHAR(si.created_at::date, 'YYYY-MM-DD') AS "billdate",
@@ -113,7 +114,9 @@ SALES_REPEAT_QUERY = '''
     WHERE 
         sid.deleted_at IS NULL
         AND si.created_at::date >= NOW()-  INTERVAL '90 days'  
+        AND si.customer_id = {customer_id};
     '''
+    return query
 
 LOST_CUSTOMER_QUERY = '''
     SELECT
@@ -272,7 +275,7 @@ FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
         ) 
     '''
 
-INSERT_GIFT_VOUCHER_STORE_QUERY = '''
+GIFT_VOUCHER_STORE_ID_QUERY = '''
     SELECT 
         id 
     FROM stores

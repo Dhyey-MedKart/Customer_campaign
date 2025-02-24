@@ -1,4 +1,5 @@
-from db.connection import get_db_engine_pos, Session_pos, get_db_engine_mre
+from db.connection import get_db_engine_pos, get_db_engine_mre
+from db.models_pos import create_session_pos
 import pandas as pd
 from db.common_helper import get_data, create_entry
 from db.queries import FIRST_FIVE_BILLS_CUSTOMER_QUERY
@@ -6,31 +7,31 @@ from services.customer_processing import convert_decimal
 from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from utils.logger import logger,logging
 from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
-
+from datetime import datetime
 from services.voucher_processing import generate_voucher_code
 from datetime import date, timedelta
 import json
 import numpy as np
 
-VOUCHER_AMOUNT = 1
-MINIMUM_ORDER_VALUE = 500
+campaign_values = {
+    '25_RUPEES': {'voucher_amount': 25,
+                  'minimum_order_value': 500},
+                  
+    'FREE_OTC': {'voucher_amount': 1,
+                 'minimum_order_value': 500}
+}
 
 
 def first_five_bills_campaign():
-    try:
-        engine = get_db_engine_pos()
-        first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
-        return first_five_bills
-    except Exception as e:
-        logging()
-        return pd.DataFrame()
+    engine = get_db_engine_pos()
+    first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
+    return first_five_bills
 
 
 def preprocess_data_first_five(first_five_bills):
     '''Function to preprocess the raw first five bills data and add the additional json to the data.'''
     try:
         # Converting the columns to string type
-        print(first_five_bills)
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].astype('str')
 
         first_five_bills[first_five_bills.columns] = first_five_bills[first_five_bills.columns].replace('nan','')
@@ -71,8 +72,8 @@ def store_results(first_five_bills):
             .apply(lambda x: {**x, **{
                 'voucher_code': generate_voucher_code(),
                 'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-                'voucher_amount': VOUCHER_AMOUNT,
-                'minimum_order_value': MINIMUM_ORDER_VALUE
+                'voucher_amount': campaign_values[x.get('campaign_type', '')]['voucher_amount'],
+                'minimum_order_value': campaign_values[x.get('campaign_type', '')]['minimum_order_value']
             }})
         )
     
@@ -81,18 +82,19 @@ def store_results(first_five_bills):
         return 
 
     try:
-        session_pos = Session_pos()
+        session_pos = create_session_pos()
         engine_mre = get_db_engine_mre()
         voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
         if not voucher_customers.empty:
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), VOUCHER_AMOUNT, 'FREE_OTC', MINIMUM_ORDER_VALUE)
+            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), 'FREE_OTC')
             insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
             insert_gift_voucher_stores(session_pos, voucher_id)
         else:
             logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
-        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+        
         session_pos.commit()
+        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
     except Exception as e:
         session_pos.rollback()
         logging()
@@ -111,3 +113,5 @@ def main():
     
 
 main()
+print(f'Succesfully executed First_five_bills at {datetime.now()}')
+logger.info(f'Succesfully executed First_five_bills at {datetime.now()}')

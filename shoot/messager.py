@@ -1,7 +1,7 @@
 import datetime
 from utils.logger import logger, logging
 from services.generate_payloads import get_payload_function
-from db.models import create_session, CampaignActivity, CustomerCampaigns
+from db.models_mre import create_session_mre, CampaignActivity, CustomerCampaigns
 import requests
 from sqlalchemy import text, func
 import time
@@ -38,7 +38,7 @@ def message_processer(row):
 
 def send_message(df):
     try:
-        session = create_session()
+        session = create_session_mre()
         for _ , row in df.iterrows():
 
             campaign_entry, payload = message_processer(row)

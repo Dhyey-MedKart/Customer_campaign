@@ -62,10 +62,10 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
                         'a_product_code', 'a_product_name', 'bc_mrp', 'a_sales_price', 'savings']]
             data2 = data1.merge(counts_data, on='customer_id')
             return data2
-        print("Out")
-        return pd.DataFrame()
+        
+        raise Exception()
     
-    except (KeyError, ValueError, TypeError) as e:
+    except Exception as e:
         logging()
         return pd.DataFrame() 
 
@@ -73,8 +73,8 @@ def convert_decimal(obj):
     try:
         if isinstance(obj, Decimal):
             return float(obj)
-        raise TypeError("Type not serializable")
-    except TypeError as e:
+        raise Exception()
+    except Exception as e:
         logging()
         return None
 
@@ -94,6 +94,7 @@ def generate_json_data(row):
             'subs_products': subs_products,
             'total_savings': total_savings
         }, default=convert_decimal)
-    except (KeyError, TypeError, ValueError) as e:
+    
+    except Exception as e:
         logging()
         return '{}' 

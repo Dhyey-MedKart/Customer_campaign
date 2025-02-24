@@ -31,7 +31,7 @@ def get_data(query,engine):
             return df
     except Exception as e:
        logging()
-       return False
+       return pd.DataFrame()
 
 
 def encrypt_id(ID):
