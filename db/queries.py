@@ -84,10 +84,16 @@ REPEAT_CUSTOMER_QUERY = '''
         c.ltv,
         c.loyalty_points,
         c.last_purchase_bill_date,
+        stores.city,
         stores.name as last_purchase_store_name,
+        sm.store_phone_number as store_contact,
+
         case when upper(stores.state)='GUJARAT' then 'GUJARATI' else 'HINDI' END as language      
     FROM customers c 
     INNER JOIN stores ON c.last_purchase_store_id = stores.id
+    INNER JOIN
+        	store_managers sm
+        	ON stores.id = sm.store_id
     WHERE 
         stores.store_type = 'COCO' 
         AND (

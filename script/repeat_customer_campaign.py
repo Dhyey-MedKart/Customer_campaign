@@ -122,8 +122,6 @@ def load_mapped_products(engine):
     """
     try:
         products = get_data(PRODUCT_MAPPED_DATA, engine)
-        if products.empty():
-            raise ValueError("No product mapping data")
         prod_mapping = dict(zip(products['ws_code'], products['id']))
         return prod_mapping
     except Exception as e:
@@ -161,19 +159,19 @@ def main():
                 insert_gift_voucher_stores(session_pos, ids)
         
 
-        # result_df.to_csv('repeat_customers.csv')
+        result_df.to_csv('repeat_customers.csv')
         # CREATE ENTRY
-        if create_entry(result_df, 'customer_campaigns', engine_mre):
-            print('Repeat_Customers data inserted successfully...')
-        else:
-            raise Exception
+        # if create_entry(result_df, 'customer_campaigns', engine_mre):
+        #     print('Repeat_Customers data inserted successfully...')
+        # else:
+        #     raise Exception
     except Exception as e:
         logging()
         session_pos.rollback()
         return
 
     finally:
-        session_pos.commit()
+        # session_pos.commit()
         session_pos.close()
 
     
