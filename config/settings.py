@@ -9,7 +9,7 @@ DB_WMS_NAME = os.getenv("DB_WMS_NAME")
 DB_WMS_USER = os.getenv("DB_WMS_USER")
 DB_WMS_PASS = os.getenv("DB_WMS_PASS")
 
-DB_MRE_HOST = os.getenv("DB_MRE_HOST")
+DB_MRE_HOST = os.getenv("DB_MRE_READ_HOST")
 DB_MRE_PORT = os.getenv("DB_MRE_PORT")
 DB_MRE_NAME = os.getenv("DB_MRE_NAME")
 DB_MRE_USER = os.getenv("DB_MRE_USER")

@@ -9,7 +9,7 @@ from uuid import uuid4  # Generate unique savings ID
 from db.common_helper import encrypt_id
 from utils.logger import logger  # Remove duplicate logging import
 from db.models_ecom import CompareSavings
-from db.connection import create_session_ecom
+from db.models_ecom import create_session_ecom
 
 
 def generate_link(customer: dict, pos_product_master_dict: dict):

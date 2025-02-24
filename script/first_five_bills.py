@@ -3,7 +3,7 @@ from db.models_pos import create_session_pos
 import pandas as pd
 from db.common_helper import get_data, create_entry
 from db.queries import FIRST_FIVE_BILLS_CUSTOMER_QUERY
-from services.customer_processing import convert_decimal
+from services.customer_processing import convert_decimal,generate_json_data,update_json_data
 from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from utils.logger import logger,logging
 from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
@@ -18,7 +18,10 @@ campaign_values = {
                   'minimum_order_value': 500},
                   
     'FREE_OTC': {'voucher_amount': 1,
-                 'minimum_order_value': 500}
+                 'minimum_order_value': 500},
+
+    '': {'voucher_amount':0,
+         'minimum_order_value':0}
 }
 
 
@@ -40,17 +43,8 @@ def preprocess_data_first_five(first_five_bills):
         first_five_bills['customer_name'] = first_five_bills['customer_name'].str.upper()
 
         first_five_bills['free_gift'] = np.where(first_five_bills['campaign_type']=='FREE_OTC','A MOR Z Multivitamin Tablets','')
-
-        first_five_bills['json_data'] = first_five_bills.apply(lambda row: json.dumps({
-            'customer_name': row['customer_name'],
-            'last_purchase_store_name': row['last_purchase_store_name'],
-            'city':row['city'],
-            'no_of_bills': row['no_of_bills'],
-            'ltv': row['ltv'],
-            'loyalty_points': row['loyalty_points'],
-            'last_purchase_bill_date': row['last_purchase_bill_date'],
-            'free_gift':row['free_gift']
-        }, default=convert_decimal), axis=1)
+        first_five_bills['json_data'] = first_five_bills.apply(generate_json_data, axis=1)
+        
         return first_five_bills
     except Exception as e:
         logging()
@@ -65,16 +59,9 @@ def store_results(first_five_bills):
         result_df = result_df.rename(columns={'mobile_number':'customer_mobile'})
         result_df = result_df[result_df['campaign_type']!='0']
         result_df['campaign'] = 'FIRST_FIVE_BILLS'
-
-        result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = (
-            result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data']
-            .apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            .apply(lambda x: {**x, **{
-                'voucher_code': generate_voucher_code(),
-                'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-                'voucher_amount': 1,
-                'minimum_order_value':500
-            }})
+        campaign_mask = result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC'])
+        result_df.loc[campaign_mask, 'json_data'] = result_df.loc[campaign_mask].apply(
+            lambda row: update_json_data(row['json_data'], row['campaign_type'], campaign_values), axis=1
         )
         result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'].apply(lambda x : json.dumps(x))
     
@@ -87,14 +74,21 @@ def store_results(first_five_bills):
         engine_mre = get_db_engine_mre()
         voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
         if not voucher_customers.empty:
+            voucher_id = []
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers),1,'FREE_OTC',500)
-            insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
-            insert_gift_voucher_stores(session_pos, voucher_id)
+            for type in campaign_values:
+                campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
+                if not campaign_voucher_customers.empty:
+                    voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
+        
+            for ids in voucher_id:
+                insert_gift_voucher_codes(session_pos, voucher_customers, ids)
+                insert_gift_voucher_stores(session_pos, ids)
         else:
             logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
+        # result_df.to_csv("fis.csv")
         if create_entry(result_df, 'customer_campaigns', engine=engine_mre):
-            print('Data inserted successfully...')
+            print('First_five_bills data inserted successfully...')
         else:
             raise Exception
     except Exception as e:

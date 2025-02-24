@@ -5,7 +5,7 @@ from datetime import datetime,date, timedelta
 from utils.logger import logging, logger
 from db.connection import get_db_engine_pos, get_db_engine_wms,get_db_engine_ecom, get_db_engine_mre
 from db.models_pos import create_session_pos
-from services.voucher_processing import generate_voucher_code, insert_gift_voucher_codes, insert_gift_voucher_stores, create_gift_voucher_summary
+from services.voucher_processing import insert_gift_voucher_codes, insert_gift_voucher_stores, create_gift_voucher_summary
 from db.common_helper import get_data, create_entry
 from db.queries import (
     get_repeat_sales,
@@ -16,7 +16,8 @@ from db.queries import (
 from services.generate_savings_url import generate_savings_data_url
 from services.customer_processing import (
     customer_branded_chronic_purchase,
-    generate_json_data
+    generate_json_data,
+    update_json_data
 )
 from services.sales_processing import sales_processing
 
@@ -26,7 +27,10 @@ campaign_values = {
                   'minimum_order_value': 500},
                   
     'FREE_OTC': {'voucher_amount': 1,
-                 'minimum_order_value': 500}
+                 'minimum_order_value': 500},
+
+    '': {'voucher_amount':0,
+         'minimum_order_value':0}
 }
 
 def initialize_engines():
@@ -39,7 +43,7 @@ def initialize_engines():
 def fetch_repeat_customers(engine_pos):
     try:
         repeat_customers = get_data(REPEAT_CUSTOMER_QUERY, engine_pos)
-        return repeat_customers, list(repeat_customers['customer_id'].unique())
+        return repeat_customers, repeat_customers['customer_id'].unique().tolist()
     except Exception as e:
         logging()
         return pd.DataFrame(), []
@@ -91,16 +95,9 @@ def merge_and_prepare_final_df(repeat_customers, processed_data):
         final_df['json_data'] = final_df.apply(generate_json_data, axis=1)
 
         ### ADDING THE JSON DATA
-        
-        final_df.loc[final_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = (
-            final_df.loc[final_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data']
-            .apply(lambda x: json.loads(x) if isinstance(x, str) else x)  # Ensure it's a dictionary
-            .apply(lambda x: {**x, **{
-                'voucher_code': generate_voucher_code(),
-                'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-                'voucher_amount': campaign_values[x.get('campaign_type', '')]['voucher_amount'],
-                'minimum_order_value': campaign_values[x.get('campaign_type', '')]['minimum_order_value']
-            }})
+        campaign_mask = final_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC'])
+        final_df.loc[campaign_mask, 'json_data'] = final_df.loc[campaign_mask].apply(
+            lambda row: update_json_data(row['json_data'], row['campaign_type'], campaign_values), axis=1
         )
 
         return final_df
@@ -144,7 +141,7 @@ def main():
         result_df = prepare_result_df(final_df)
         product_mapped_data = load_mapped_products(engine_ecom)
         result_df = generate_savings_data_url(result_df, product_mapped_data)
-        # result_df.to_csv('repeat_customers.csv')
+        
     except Exception as e:
         logging()
 
@@ -152,19 +149,31 @@ def main():
         session_pos = create_session_pos()
         voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
         if not voucher_customers.empty:
+            voucher_id = []
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), 'FREE_OTC')
-            insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
-            insert_gift_voucher_stores(session_pos, voucher_id)
+            for type in campaign_values:
+                campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
+                if not campaign_voucher_customers.empty:
+                    voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
+        
+            for ids in voucher_id:
+                insert_gift_voucher_codes(session_pos, voucher_customers, ids)
+                insert_gift_voucher_stores(session_pos, ids)
+        
+
+        # result_df.to_csv('repeat_customers.csv')
         # CREATE ENTRY
-        session_pos.commit()
-        create_entry(result_df, 'customer_campaigns', engine_mre)
+        if create_entry(result_df, 'customer_campaigns', engine_mre):
+            print('Repeat_Customers data inserted successfully...')
+        else:
+            raise Exception
     except Exception as e:
         logging()
         session_pos.rollback()
         return
 
     finally:
+        session_pos.commit()
         session_pos.close()
 
     

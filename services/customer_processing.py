@@ -3,6 +3,8 @@ import numpy as np
 import json
 from decimal import Decimal
 from utils.logger import logging
+from datetime import date,timedelta
+from services.voucher_processing import generate_voucher_code
 
 def customer_branded_chronic_purchase(assured_mapping, sales):
     try:
@@ -32,7 +34,6 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
         sales = sales[sales['product_code'].isin(all_products)]
         
         filtered_sales_list = []
-        # 1039
         for customer, group in sales.groupby('customer_id'):
             customer_products = group['product_code'].tolist()
             bought_assured = [product for product in customer_products if product in assured_products]
@@ -63,7 +64,7 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
             data2 = data1.merge(counts_data, on='customer_id')
             return data2
         
-        raise Exception()
+        raise Exception("filtered_sales_list is empty")
     
     except Exception as e:
         logging()
@@ -87,6 +88,8 @@ def generate_json_data(row):
         return json.dumps({
             'customer_name': row.get('customer_name', ''),
             'last_purchase_store_name': row.get('last_purchase_store_name', ''),
+            'store_contact': row['store_contact'],
+            'city': row['city'],
             'no_of_bills': row.get('no_of_bills', ''),
             'ltv': row.get('ltv', ''),
             'loyalty_points': row.get('loyalty_points', ''),
@@ -98,3 +101,20 @@ def generate_json_data(row):
     except Exception as e:
         logging()
         return '{}' 
+
+def update_json_data(json_str, campaign_type, campaign_values):
+    try:
+        json_data = json.loads(json_str) if isinstance(json_str, str) else json_str
+        if not isinstance(json_data, dict):
+            return json_data
+        if campaign_type not in campaign_values:
+            return json_data
+        json_data.update({
+            'voucher_code': generate_voucher_code(),
+            'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
+            'voucher_amount': campaign_values[campaign_type]['voucher_amount'],
+            'minimum_order_value': campaign_values[campaign_type]['minimum_order_value']
+        })
+        return json_data
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return json_str
