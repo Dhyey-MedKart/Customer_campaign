@@ -72,10 +72,11 @@ def store_results(first_five_bills):
             .apply(lambda x: {**x, **{
                 'voucher_code': generate_voucher_code(),
                 'expiry_date': (date.today() + timedelta(8)).strftime('%d-%b-%Y'),
-                'voucher_amount': campaign_values[x.get('campaign_type', '')]['voucher_amount'],
-                'minimum_order_value': campaign_values[x.get('campaign_type', '')]['minimum_order_value']
+                'voucher_amount': 1,
+                'minimum_order_value':500
             }})
         )
+        result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'].apply(lambda x : json.dumps(x))
     
     except Exception as e:
         logging()
@@ -87,20 +88,22 @@ def store_results(first_five_bills):
         voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
         if not voucher_customers.empty:
             voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers), 'FREE_OTC')
+            voucher_id = create_gift_voucher_summary(session_pos, len(voucher_customers),1,'FREE_OTC',500)
             insert_gift_voucher_codes(session_pos, voucher_customers, voucher_id)
             insert_gift_voucher_stores(session_pos, voucher_id)
         else:
             logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
-        
-        session_pos.commit()
-        create_entry(result_df, 'customer_campaigns', engine=engine_mre)
+        if create_entry(result_df, 'customer_campaigns', engine=engine_mre):
+            print('Data inserted successfully...')
+        else:
+            raise Exception
     except Exception as e:
         session_pos.rollback()
         logging()
         return
     
     finally:
+        session_pos.commit()
         session_pos.close()
 
 def main():
