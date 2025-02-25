@@ -288,7 +288,6 @@ FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
             stores.store_type = 'COCO' 
             AND c.no_of_bills < 5 
             AND c.aov > 100
-            and c.last_purchase_bill_date::date >= '2025-01-01'
             AND ( c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
                     OR c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE
                     OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE

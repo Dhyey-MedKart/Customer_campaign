@@ -26,6 +26,7 @@ VOUCHER_CAMPAIGNS = ['25_RUPEES', 'FREE_OTC']
 def first_five_bills_campaign():
     engine = get_db_engine_pos()
     first_five_bills = get_data(FIRST_FIVE_BILLS_CUSTOMER_QUERY, engine=engine)
+    first_five_bills = first_five_bills[first_five_bills['campaign_type']!='0']
     return first_five_bills
 
 
@@ -55,7 +56,6 @@ def store_results(first_five_bills):
         # Create the final DataFrame with 'mobile_number' and 'json_data'
         result_df = first_five_bills[['mobile_number','customer_code','campaign_type','language', 'json_data']]
         result_df = result_df.rename(columns={'mobile_number':'customer_mobile'})
-        result_df = result_df[result_df['campaign_type']!='0']
         result_df['campaign'] = 'FIRST_FIVE_BILLS'
         campaign_mask = result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC'])
         result_df.loc[campaign_mask, 'json_data'] = result_df.loc[campaign_mask].apply(
@@ -68,16 +68,13 @@ def store_results(first_five_bills):
             engine_mre = get_db_engine_mre()
             voucher_customers = result_df[result_df['campaign_type'].isin(VOUCHER_CAMPAIGNS)]
             if not voucher_customers.empty:
-                voucher_id = []
                 voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
                 for type in campaign_values:
                     campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
                     if not campaign_voucher_customers.empty:
-                        voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
-            
-                for ids in voucher_id:
-                    insert_gift_voucher_codes(session_pos, voucher_customers, ids)
-                    insert_gift_voucher_stores(session_pos, ids)
+                        voucher_id = create_gift_voucher_summary(session_pos, len(campaign_voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value'])
+                        insert_gift_voucher_codes(session_pos, campaign_voucher_customers, voucher_id)
+                        insert_gift_voucher_stores(session_pos, voucher_id)
             else:
                 logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
             # result_df.to_csv("fis.csv")

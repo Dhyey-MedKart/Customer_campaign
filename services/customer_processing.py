@@ -99,7 +99,7 @@ def generate_json_data(row):
     
     except Exception as e:
         logging()
-        return '{}' 
+        return json.dumps({}) 
 
 def update_json_data(json_str, campaign_type, campaign_values):
     try:
