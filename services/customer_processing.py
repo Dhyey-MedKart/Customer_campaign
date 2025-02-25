@@ -31,8 +31,8 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
         
         assured_products = assured_mapping['a_product_code'].unique()
         assured_mapping_dict = dict(zip(assured_mapping['bc_product_code'], assured_mapping['a_product_code']))
-        sales = sales[sales['product_code'].isin(all_products)]
         
+        sales = sales[sales['product_code'].isin(all_products)]
         filtered_sales_list = []
         for customer, group in sales.groupby('customer_id'):
             customer_products = group['product_code'].tolist()
@@ -45,7 +45,6 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
                 filtered_sales = group
 
             filtered_sales_list.append(filtered_sales)
-            
         # If sales are found for a customer
         if filtered_sales_list:  
             data = pd.concat(filtered_sales_list)
@@ -64,8 +63,8 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
             data2 = data1.merge(counts_data, on='customer_id')
             return data2
         
-        raise Exception("filtered_sales_list is empty")
-    
+        raise Exception("No data got from sales['product_code'].isin(all_products)...")
+
     except Exception as e:
         logging()
         return pd.DataFrame() 

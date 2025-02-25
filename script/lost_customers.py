@@ -1,5 +1,5 @@
 import json
-from datetime import datetime,timedelta, date
+from datetime import datetime
 import sys
 from utils.logger import logging, logger
 import numpy as np
@@ -29,6 +29,8 @@ campaign_values = {
     '': {'voucher_amount':0,
          'minimum_order_value':0}
 }
+
+VOUCHER_CAMPAIGNS = ['25_RUPEES', 'FREE_OTC']
 
 def initialize_engines():
     try:
@@ -191,12 +193,13 @@ def main():
     try:
         engine_pos, engine_wms, engine_ecom, engine_mre = initialize_engines()
         customers = load_customers(engine_pos)
+        if customers.empty:
+            raise Exception("No customers in lost customers")
         today = datetime.today()
         reference_date = compute_reference_date(today)
         customers['reference_date'] = reference_date
         
         customers = apply_campaign_category(customers, reference_date, campaign_name='LOST_CUSTOMER')
-        # customers.to_csv("campaign.csv")
         
         m3_customer_ids = customers[customers['category'] == 'M3']['customer_id'].tolist()
         if len(m3_customer_ids) == 0:
@@ -212,44 +215,44 @@ def main():
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
         final_df = generate_savings_data_url(final_df, product_mapped_data)
-        voucher_customers = final_df[final_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
+
+        try:
+            session_pos = create_session_pos()
+            voucher_customers = final_df[final_df['campaign_type'].isin(VOUCHER_CAMPAIGNS)]
+            if not voucher_customers.empty:
+                voucher_id = []
+                voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
+                for type in campaign_values:
+                    campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
+                    if not campaign_voucher_customers.empty:
+                        voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
+            
+                for ids in voucher_id:
+                    insert_gift_voucher_codes(session_pos, voucher_customers, ids)
+                    insert_gift_voucher_stores(session_pos, ids)
+            
+            # CREATE ENTRY
+            # final_df.to_csv("Lost.csv")
+            if create_entry(final_df, 'customer_campaigns', engine_mre):
+                print('Lost_Customer data inserted successfully...')
+            else:
+                raise Exception
+        except Exception as e:
+            logging()
+            session_pos.rollback()
+            return
+
+        finally:
+            session_pos.commit()
+            session_pos.close()
         
     except Exception as e:
         logging()
 
-    try:
-        session_pos = create_session_pos()
-        
-        if not voucher_customers.empty:
-            voucher_id = []
-            voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            for type in campaign_values:
-                campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
-                if not campaign_voucher_customers.empty:
-                    voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
-        
-            for ids in voucher_id:
-                insert_gift_voucher_codes(session_pos, voucher_customers, ids)
-                insert_gift_voucher_stores(session_pos, ids)
-        
-        # CREATE ENTRY
-        # final_df.to_csv("Lost.csv")
-        if create_entry(final_df, 'customer_campaigns', engine_mre):
-            print('Lost_Customer data inserted successfully...')
-        else:
-            raise Exception
-    except Exception as e:
-        logging()
-        session_pos.rollback()
-        return
-
-    finally:
-        session_pos.commit()
-        session_pos.close()
 
 today = datetime.today().day
-if today not in [5, 20,24]:
-    logging()
+if today not in [5, 20,25]:
+    logger.error("Not execuable today")
     sys.exit()
 main()
 print(f'Succesfully executed Lost_customers at {datetime.now()}')

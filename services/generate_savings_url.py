@@ -12,6 +12,8 @@ from db.models_ecom import CompareSavings
 from db.models_ecom import create_session_ecom
 
 
+URL_CAMPAIGN_TYPE = ['Branded_Chronic']
+
 def generate_link(customer: dict, pos_product_master_dict: dict):
     """
     Generate and store savings link for a customer.
@@ -48,21 +50,24 @@ def generate_link(customer: dict, pos_product_master_dict: dict):
         session_ecom.add(savings)
         session_ecom.flush() 
 
-        customer_copy = customer.copy()  
-        customer_copy['savings_url'] = f"https://www.medkart.in/savings/{encrypt_id(savings.id)}"
-
+        # customer_copy = customer.copy()  
+        # customer_copy['savings_url'] = f"https://www.medkart.in/savings/{encrypt_id(savings.id)}"
+        url = f"https://www.medkart.in/savings/{encrypt_id(savings.id)}"
+        
         session_ecom.commit()
 
-        return pd.DataFrame([customer_copy])
+        # return pd.DataFrame([customer_copy])
+        return url
 
     except Exception as e:
         session_ecom.rollback()
         logger.error(f"An error occurred in generate_link: {e}")
 
         # Return customer data with savings_url as None
-        customer_data = customer.copy()
-        customer_data['savings_url'] = None
-        return pd.DataFrame([customer_data])
+        # customer_data = customer.copy()
+        # customer_data['savings_url'] = None
+        # return pd.DataFrame([customer_data])
+        return None
 
     finally:
         session_ecom.close()
@@ -80,9 +85,14 @@ def generate_savings_data_url(customers, product_mapping):
         pd.DataFrame: Updated customer data.
     """
     updated_customers = []
+    customers.loc[customers['campaign_type'].isin(URL_CAMPAIGN_TYPE), 'savings_url'] = (
+        customers.loc[customers['campaign_type'].isin(URL_CAMPAIGN_TYPE)].copy()
+        .apply(lambda row: generate_link(row.to_dict(), product_mapping), axis=1)
+    )
 
-    for _, customer in customers.iterrows():
-        updated_customer_df = generate_link(customer.to_dict(), product_mapping)
-        updated_customers.append(updated_customer_df)
+    # for _, customer in customers.iterrows():
+    #     updated_customer_df = generate_link(customer.to_dict(), product_mapping)
+    #     updated_customers.append(updated_customer_df)
 
-    return pd.concat(updated_customers, ignore_index=True) if updated_customers else customers
+    # return pd.concat(updated_customers, ignore_index=True) if updated_customers else customers
+    return customers

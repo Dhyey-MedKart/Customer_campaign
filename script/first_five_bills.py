@@ -1,15 +1,12 @@
 from db.connection import get_db_engine_pos, get_db_engine_mre
 from db.models_pos import create_session_pos
-import pandas as pd
 from db.common_helper import get_data, create_entry
 from db.queries import FIRST_FIVE_BILLS_CUSTOMER_QUERY
-from services.customer_processing import convert_decimal,generate_json_data,update_json_data
+from services.customer_processing import generate_json_data,update_json_data
 from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
 from utils.logger import logger,logging
 from services.voucher_processing import create_gift_voucher_summary, insert_gift_voucher_codes, insert_gift_voucher_stores
-from datetime import datetime
-from services.voucher_processing import generate_voucher_code
-from datetime import date, timedelta
+from datetime import date, datetime
 import json
 import numpy as np
 
@@ -24,6 +21,7 @@ campaign_values = {
          'minimum_order_value':0}
 }
 
+VOUCHER_CAMPAIGNS = ['25_RUPEES', 'FREE_OTC']
 
 def first_five_bills_campaign():
     engine = get_db_engine_pos()
@@ -65,40 +63,41 @@ def store_results(first_five_bills):
         )
         result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'].apply(lambda x : json.dumps(x))
     
+        try:
+            session_pos = create_session_pos()
+            engine_mre = get_db_engine_mre()
+            voucher_customers = result_df[result_df['campaign_type'].isin(VOUCHER_CAMPAIGNS)]
+            if not voucher_customers.empty:
+                voucher_id = []
+                voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
+                for type in campaign_values:
+                    campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
+                    if not campaign_voucher_customers.empty:
+                        voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
+            
+                for ids in voucher_id:
+                    insert_gift_voucher_codes(session_pos, voucher_customers, ids)
+                    insert_gift_voucher_stores(session_pos, ids)
+            else:
+                logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
+            # result_df.to_csv("fis.csv")
+            if create_entry(result_df, 'customer_campaigns', engine=engine_mre):
+                print('First_five_bills data inserted successfully...')
+            else:
+                raise Exception
+        except Exception as e:
+            session_pos.rollback()
+            logging()
+            return
+        
+        finally:
+            session_pos.commit()
+            session_pos.close()
+            
     except Exception as e:
         logging()
         return 
 
-    try:
-        session_pos = create_session_pos()
-        engine_mre = get_db_engine_mre()
-        voucher_customers = result_df[result_df['campaign_type'].isin(['FREE_OTC', '25_RUPEES'])]
-        if not voucher_customers.empty:
-            voucher_id = []
-            voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            for type in campaign_values:
-                campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
-                if not campaign_voucher_customers.empty:
-                    voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
-        
-            for ids in voucher_id:
-                insert_gift_voucher_codes(session_pos, voucher_customers, ids)
-                insert_gift_voucher_stores(session_pos, ids)
-        else:
-            logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
-        # result_df.to_csv("fis.csv")
-        if create_entry(result_df, 'customer_campaigns', engine=engine_mre):
-            print('First_five_bills data inserted successfully...')
-        else:
-            raise Exception
-    except Exception as e:
-        session_pos.rollback()
-        logging()
-        return
-    
-    finally:
-        session_pos.commit()
-        session_pos.close()
 
 def main():
     df = first_five_bills_campaign()

@@ -87,7 +87,6 @@ REPEAT_CUSTOMER_QUERY = '''
         stores.city,
         stores.name as last_purchase_store_name,
         sm.store_phone_number as store_contact,
-
         case when upper(stores.state)='GUJARAT' then 'GUJARATI' else 'HINDI' END as language      
     FROM customers c 
     INNER JOIN stores ON c.last_purchase_store_id = stores.id
