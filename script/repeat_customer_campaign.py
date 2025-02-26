@@ -155,12 +155,9 @@ def main():
                 for type in campaign_values:
                     campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
                     if not campaign_voucher_customers.empty:
-                        voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
-            
-                for ids in voucher_id:
-                    insert_gift_voucher_codes(session_pos, voucher_customers, ids)
-                    insert_gift_voucher_stores(session_pos, ids)
-            
+                        voucher_id = create_gift_voucher_summary(session_pos, len(campaign_voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value'])
+                        insert_gift_voucher_codes(session_pos, campaign_voucher_customers, voucher_id)
+                        insert_gift_voucher_stores(session_pos, voucher_id)
 
             result_df.to_csv('repeat_customers.csv')
             # CREATE ENTRY
