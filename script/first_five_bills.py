@@ -78,6 +78,7 @@ def store_results(first_five_bills):
             else:
                 logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
             # result_df.to_csv("fis.csv")
+            result_df = result_df[result_df['customer_code'].notna()]
             if create_entry(result_df, 'customer_campaigns', engine=engine_mre):
                 print('First_five_bills data inserted successfully...')
             else:

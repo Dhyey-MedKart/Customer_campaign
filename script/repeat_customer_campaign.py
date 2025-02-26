@@ -160,6 +160,8 @@ def main():
                         insert_gift_voucher_stores(session_pos, voucher_id)
 
             result_df.to_csv('repeat_customers.csv')
+            result_df = result_df[result_df['customer_code'].notna()]
+
             # CREATE ENTRY
             # if create_entry(result_df, 'customer_campaigns', engine_mre):
             #     print('Repeat_Customers data inserted successfully...')

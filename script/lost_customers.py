@@ -234,6 +234,7 @@ def main():
             # CREATE ENTRY
         
             final_df['json_data'] = final_df['json_data'].apply(lambda x:json.dumps(x))
+            final_df = final_df[final_df['customer_code'].notna()]
             create_entry(final_df, 'customer_campaigns', engine_mre)
 
 
