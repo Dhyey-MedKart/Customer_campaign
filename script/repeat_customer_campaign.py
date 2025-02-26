@@ -93,21 +93,24 @@ def assign_campaign_types(repeat_customers, processed_data):
 
 def merge_and_prepare_final_df(repeat_customers, processed_data):
     try:
-        final_df = repeat_customers.merge(processed_data, on='customer_id', how='left')
-        final_df['products'] = final_df['products'].apply(
-            lambda x: json.loads(x) if isinstance(x, str) and x.startswith('[') else []
-        )
+        if not processed_data.empty:
+            final_df = repeat_customers.merge(processed_data, on='customer_id', how='left')
+            final_df['products'] = final_df['products'].apply(
+                lambda x: json.loads(x) if isinstance(x, str) and x.startswith('[') else []
+            )
+        else:
+            final_df = repeat_customers
+
         final_df[['no_of_bills', 'ltv', 'loyalty_points', 'last_purchase_bill_date']] = final_df[
             ['no_of_bills', 'ltv', 'loyalty_points', 'last_purchase_bill_date']
         ].astype(str)
         final_df['json_data'] = final_df.apply(generate_json_data, axis=1)
-
         ### ADDING THE JSON DATA
-        campaign_mask = final_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC'])
+        campaign_mask = final_df['campaign_type'].isin(VOUCHER_CAMPAIGNS)
         final_df.loc[campaign_mask, 'json_data'] = final_df.loc[campaign_mask].apply(
             lambda row: update_json_data(row['json_data'], row['campaign_type'], campaign_values), axis=1
         )
-
+        
         return final_df
     except Exception as e:
         logging()
@@ -115,6 +118,7 @@ def merge_and_prepare_final_df(repeat_customers, processed_data):
 
 def prepare_result_df(final_df):
     try:
+        
         result_df = final_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']]
         result_df = result_df.rename(columns={'mobile_number': 'customer_mobile'})
         result_df = result_df[result_df['campaign_type'] != '0']
@@ -145,7 +149,7 @@ def main():
         sales_data = fetch_sales_data(engine_pos, tuple(repeat_customer_ids))
         processed_data = process_data(engine_wms, sales_data)
         if processed_data.empty:
-            raise Exception('No customers got JSON data...')
+            logger.info('No Branded Chronic customers')
         repeat_customers = assign_campaign_types(repeat_customers, processed_data)
         final_df = merge_and_prepare_final_df(repeat_customers, processed_data)
         result_df = prepare_result_df(final_df)
@@ -165,21 +169,22 @@ def main():
                         insert_gift_voucher_codes(session_pos, campaign_voucher_customers, voucher_id)
                         insert_gift_voucher_stores(session_pos, voucher_id)
 
-            result_df.to_csv('repeat_customers.csv')
+            
+            result_df.loc[:, 'json_data'] = result_df['json_data'].apply(lambda x: x if isinstance(x, str) else json.dumps(x))
             result_df = result_df[result_df['customer_code'].notna()]
 
             # CREATE ENTRY
-            # if create_entry(result_df, 'customer_campaigns', engine_mre):
-            #     print('Repeat_Customers data inserted successfully...')
-            # else:
-            #     raise Exception
+            if create_entry(result_df, 'customer_campaigns', engine_mre):
+                logger.info(f'Succesfully inserted data of Repeat_Customers campaign at {datetime.now()}')
+            else:
+                raise Exception
         except Exception as e:
             logging()
             session_pos.rollback()
             return
 
         finally:
-            # session_pos.commit()
+            session_pos.commit()
             session_pos.close()
 
     except Exception as e:
@@ -192,5 +197,4 @@ def main():
 # if __name__ == "__main__":
 
 main()
-print(f'Succesfully executed Repeat_Customers at {datetime.now()}')
-logger.info(f'Succesfully executed Repeat_Customers at {datetime.now()}')
+logger.info(f'Executed Repeat_Customers at {datetime.now()}')

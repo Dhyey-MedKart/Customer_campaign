@@ -163,20 +163,20 @@ def build_final_dataframe(customers, sales_data):
 
         # Create JSON
         merged_df['json_data'] = merged_df.apply(generate_json_data, axis=1)
+        
 
         ## ADDING THE EXTRA JSON DATA 
-        campaign_mask = merged_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC'])
+        campaign_mask = merged_df['campaign_type'].isin(VOUCHER_CAMPAIGNS)
         merged_df.loc[campaign_mask, 'json_data'] = merged_df.loc[campaign_mask].apply(
             lambda row: update_json_data(row['json_data'], row['campaign_type'], campaign_values), axis=1
         )
-        
-        result_df = merged_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']].copy()
-        result_df.rename(columns={'mobile_number': 'customer_mobile'}, inplace=True)
+        merged_df = merged_df[['mobile_number', 'customer_code', 'campaign_type', 'language', 'json_data']].copy()
+        merged_df.rename(columns={'mobile_number': 'customer_mobile'}, inplace=True)
 
-        result_df = result_df[result_df['campaign_type'] != '0']
-        result_df['campaign'] = 'LOST'
+        merged_df = merged_df[merged_df['campaign_type'] != '0']
+        merged_df['campaign'] = 'LOST'
         
-        return result_df
+        return merged_df
     
     except Exception as e:
         logging()
@@ -220,7 +220,6 @@ def main():
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
         final_df = generate_savings_data_url(final_df, product_mapped_data)
-        
 
         try:
             session_pos = create_session_pos()
@@ -234,14 +233,17 @@ def main():
                         voucher_id = create_gift_voucher_summary(session_pos, len(campaign_voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value'])
                         insert_gift_voucher_codes(session_pos, campaign_voucher_customers, voucher_id)
                         insert_gift_voucher_stores(session_pos, voucher_id)
+                voucher_customers.loc[:, 'json_data'] = voucher_customers['json_data'].apply(lambda x: json.dumps(x))
 
-            # CREATE ENTRY
-        
-            final_df['json_data'] = final_df['json_data'].apply(lambda x:json.dumps(x))
+
+            final_df.loc[:, 'json_data'] = final_df['json_data'].apply(lambda x: x if isinstance(x, str) else json.dumps(x))
             final_df = final_df[final_df['customer_code'].notna()]
-            create_entry(final_df, 'customer_campaigns', engine_mre)
 
-
+            if create_entry(final_df, 'customer_campaigns', engine_mre):
+                logger.info(f'Succesfully inserted data of Lost Customers campaign at {datetime.now()}')
+            else:
+                raise Exception
+            
         except Exception as e:
             logging()
             session_pos.rollback()
@@ -256,13 +258,12 @@ def main():
 
 
 today = datetime.today().day
-if today not in [5, 20,25]:
+if today not in [5, 20,26]:
     logger.error("Not execuable today")
     sys.exit()
 main()
 <<<<<<< HEAD
 =======
-print(f'Succesfully executed Lost_customers at {datetime.now()}')
-logger.info(f'Succesfully executed Lost_customers at {datetime.now()}')
+logger.info(f'Executed Lost_customers at {datetime.now()}')
 >>>>>>> 8f8a707138728c396458722619c8de5e7daa1912
 

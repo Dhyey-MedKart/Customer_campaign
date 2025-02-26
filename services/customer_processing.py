@@ -63,11 +63,11 @@ def customer_branded_chronic_purchase(assured_mapping, sales):
             data2 = data1.merge(counts_data, on='customer_id')
             return data2
         
-        raise Exception("No data got from sales['product_code'].isin(all_products)...")
+        return pd.DataFrame([],columns=['store_id','billdate','customer_id','bc_product_code','bc_product_name','a_product_code','a_product_name','bc_mrp','a_sales_price','savings'])
 
     except Exception as e:
         logging()
-        return pd.DataFrame() 
+        return pd.DataFrame()
 
 def convert_decimal(obj):
     try:
@@ -83,7 +83,6 @@ def generate_json_data(row):
         subs_products = row.get('products', [])
         total_savings = sum(item.get('savings', 0) for item in subs_products) if subs_products else 0
         total_savings = str(total_savings)
-
         return json.dumps({
             'customer_name': row.get('customer_name', ''),
             'last_purchase_store_name': row.get('last_purchase_store_name', ''),
