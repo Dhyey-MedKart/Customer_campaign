@@ -37,7 +37,8 @@ def initialize_engines():
         return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom(), get_db_engine_mre()
     except Exception as e:
         logging()
-        raise
+        return
+        
 def load_customers(engine):
     """
     Load repeat customers from the database and convert the date column.
