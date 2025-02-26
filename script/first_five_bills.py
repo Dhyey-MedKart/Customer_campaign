@@ -57,11 +57,11 @@ def store_results(first_five_bills):
         result_df = first_five_bills[['mobile_number','customer_code','campaign_type','language', 'json_data']]
         result_df = result_df.rename(columns={'mobile_number':'customer_mobile'})
         result_df['campaign'] = 'FIRST_FIVE_BILLS'
-        campaign_mask = result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC'])
+        campaign_mask = result_df['campaign_type'].isin(VOUCHER_CAMPAIGNS)
         result_df.loc[campaign_mask, 'json_data'] = result_df.loc[campaign_mask].apply(
             lambda row: update_json_data(row['json_data'], row['campaign_type'], campaign_values), axis=1
         )
-        result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'] = result_df.loc[result_df['campaign_type'].isin(['25_RUPEES', 'FREE_OTC']), 'json_data'].apply(lambda x : json.dumps(x))
+        result_df.loc[result_df['campaign_type'].isin(VOUCHER_CAMPAIGNS), 'json_data'] = result_df.loc[result_df['campaign_type'].isin(VOUCHER_CAMPAIGNS), 'json_data'].apply(lambda x : json.dumps(x))
     
         try:
             session_pos = create_session_pos()
@@ -76,11 +76,11 @@ def store_results(first_five_bills):
                         insert_gift_voucher_codes(session_pos, campaign_voucher_customers, voucher_id)
                         insert_gift_voucher_stores(session_pos, voucher_id)
             else:
-                logger.info(f"No data to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
+                logger.info(f"No Vouchers to insert in campaign first five bills on {format(date.today(),'%d-%b-%Y')}")
             # result_df.to_csv("fis.csv")
             result_df = result_df[result_df['customer_code'].notna()]
             if create_entry(result_df, 'customer_campaigns', engine=engine_mre):
-                print('First_five_bills data inserted successfully...')
+                logger.info(f'Succesfully inserted data of First_five_bills campaign at {datetime.now()}')
             else:
                 raise Exception
         except Exception as e:
@@ -107,5 +107,4 @@ def main():
     
 
 main()
-print(f'Succesfully executed First_five_bills at {datetime.now()}')
-logger.info(f'Succesfully executed First_five_bills at {datetime.now()}')
+logger.info(f'Executed First_five_bills at {datetime.now()}')

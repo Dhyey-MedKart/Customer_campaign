@@ -5,7 +5,7 @@ from utils.logger import logging, logger
 def sales_processing(data):
     try:
         if data.empty:
-            raise Exception("Input data in Sales_processing.py is empty.")
+            return data
 
         grouped_data = data.groupby('customer_id').apply(lambda group: json.dumps([
             {
