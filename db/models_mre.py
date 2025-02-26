@@ -23,8 +23,7 @@ class CustomerCampaigns(Base):
     round = Column(Integer, nullable=False,default=1)
     is_message_sent = Column(Boolean, nullable=False)
     campaign = Column(String(100), nullable=False)
-    savings_url = Column(String(250), nullable=False)
-    voucher_code = Column(String(250), nullable=True)
+    savings_url = Column(String(250), nullable=True)
 
 class CampaignActivity(Base):
     __tablename__ = 'campaign_activity'

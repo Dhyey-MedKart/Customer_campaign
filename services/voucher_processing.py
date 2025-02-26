@@ -44,9 +44,9 @@ def insert_gift_voucher_codes(session_pos, customers, voucher_id):
         gift_voucher_entry = GiftVoucherCode(
             gift_voucher_id=voucher_id,
             voucher_code=customer['json_data']['voucher_code'],
-            voucher_amount=customer['json_data']['voucher_amount'],
+            voucher_amount=int(customer['json_data']['voucher_amount']),
             expired_at=date.today() + timedelta(8),
-            minimum_order_value=customer['json_data']['minimum_order_value'],
+            minimum_order_value=int(customer['json_data']['minimum_order_value']),
             created_by=ADMIN_USER
         )
         session_pos.add(gift_voucher_entry)

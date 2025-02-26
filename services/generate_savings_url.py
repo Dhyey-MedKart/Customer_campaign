@@ -84,7 +84,7 @@ def generate_savings_data_url(customers, product_mapping):
     Returns:
         pd.DataFrame: Updated customer data.
     """
-    updated_customers = []
+    
     customers.loc[customers['campaign_type'].isin(URL_CAMPAIGN_TYPE), 'savings_url'] = (
         customers.loc[customers['campaign_type'].isin(URL_CAMPAIGN_TYPE)].copy()
         .apply(lambda row: generate_link(row.to_dict(), product_mapping), axis=1)

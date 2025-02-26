@@ -38,7 +38,6 @@ def initialize_engines():
     except Exception as e:
         logging()
         raise
-
 def load_customers(engine):
     """
     Load repeat customers from the database and convert the date column.
@@ -46,6 +45,7 @@ def load_customers(engine):
     customers = get_data(LOST_CUSTOMER_QUERY, engine)
     customers['last_purchase_bill_date'] = pd.to_datetime(customers['last_purchase_bill_date'])
     return customers
+
 
 def compute_reference_date(today):
     """
@@ -171,6 +171,7 @@ def build_final_dataframe(customers, sales_data):
 
         result_df = result_df[result_df['campaign_type'] != '0']
         result_df['campaign'] = 'LOST'
+        
         return result_df
     
     except Exception as e:
@@ -187,7 +188,7 @@ def load_mapped_products(engine):
         return prod_mapping
     except Exception as e:
         logging()
-        return {}
+        return json.dumps({})
 
 def main():
     try:
@@ -215,6 +216,7 @@ def main():
         # URL parameter
         product_mapped_data = load_mapped_products(engine_ecom)
         final_df = generate_savings_data_url(final_df, product_mapped_data)
+        
 
         try:
             session_pos = create_session_pos()
@@ -225,18 +227,16 @@ def main():
                 for type in campaign_values:
                     campaign_voucher_customers = voucher_customers[voucher_customers['campaign_type']==type]
                     if not campaign_voucher_customers.empty:
-                        voucher_id.append(create_gift_voucher_summary(session_pos, len(voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value']))
-            
-                for ids in voucher_id:
-                    insert_gift_voucher_codes(session_pos, voucher_customers, ids)
-                    insert_gift_voucher_stores(session_pos, ids)
-            
+                        voucher_id = create_gift_voucher_summary(session_pos, len(campaign_voucher_customers), campaign_values[type]['voucher_amount'],type,campaign_values[type]['minimum_order_value'])
+                        insert_gift_voucher_codes(session_pos, campaign_voucher_customers, voucher_id)
+                        insert_gift_voucher_stores(session_pos, voucher_id)
+
             # CREATE ENTRY
-            # final_df.to_csv("Lost.csv")
-            if create_entry(final_df, 'customer_campaigns', engine_mre):
-                print('Lost_Customer data inserted successfully...')
-            else:
-                raise Exception
+        
+            final_df['json_data'] = final_df['json_data'].apply(lambda x:json.dumps(x))
+            create_entry(final_df, 'customer_campaigns', engine_mre)
+
+
         except Exception as e:
             logging()
             session_pos.rollback()
