@@ -1,14 +1,10 @@
-from db.models import GiftVoucher
-from db.models import CustomerCampaigns
-from db.models import GiftVoucherCode
-from db.models import GiftVoucherApplicableStore
+from db.models_pos import GiftVoucher, GiftVoucherCode, GiftVoucherApplicableStore
 from datetime import date, timedelta
 from db.common_helper import get_data
 from db.connection import get_db_engine_pos
-from db.queries import INSERT_GIFT_VOUCHER_STORE_QUERY
+from db.queries import GIFT_VOUCHER_STORE_ID_QUERY
 from utils.logger import logger, logging
 from sqlalchemy.orm.attributes import flag_modified
-import json
 import random
 from datetime import datetime
 from dotenv import load_dotenv
@@ -48,16 +44,16 @@ def insert_gift_voucher_codes(session_pos, customers, voucher_id):
         gift_voucher_entry = GiftVoucherCode(
             gift_voucher_id=voucher_id,
             voucher_code=customer['json_data']['voucher_code'],
-            voucher_amount=customer['json_data']['voucher_amount'],
+            voucher_amount=int(customer['json_data']['voucher_amount']),
             expired_at=date.today() + timedelta(8),
-            minimum_order_value=customer['json_data']['minimum_order_value'],
+            minimum_order_value=int(customer['json_data']['minimum_order_value']),
             created_by=ADMIN_USER
         )
         session_pos.add(gift_voucher_entry)
 
 
 def insert_gift_voucher_stores(session_pos, voucher_id):
-    stores = get_data(INSERT_GIFT_VOUCHER_STORE_QUERY, get_db_engine_pos())
+    stores = get_data(GIFT_VOUCHER_STORE_ID_QUERY, get_db_engine_pos())
     store_ids = list(stores['id'].unique())
     
     for store_id in store_ids:

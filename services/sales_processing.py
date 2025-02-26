@@ -5,8 +5,7 @@ from utils.logger import logging, logger
 def sales_processing(data):
     try:
         if data.empty:
-            logger.error(f"Input data in Sales_processing.py is empty")
-            raise ValueError("Input data in Sales_processing.py is empty")
+            raise Exception("Input data in Sales_processing.py is empty.")
 
         grouped_data = data.groupby('customer_id').apply(lambda group: json.dumps([
             {
@@ -21,12 +20,7 @@ def sales_processing(data):
         ])).reset_index().rename(columns={0: 'products'})
 
         return grouped_data
-    except KeyError as e:
-        logging()
-        return pd.DataFrame()
-    except ValueError as e:
-        logging()
-        return pd.DataFrame()
+
     except Exception as e:
         logging()
         return pd.DataFrame()

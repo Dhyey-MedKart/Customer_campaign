@@ -84,10 +84,15 @@ REPEAT_CUSTOMER_QUERY = '''
         c.ltv,
         c.loyalty_points,
         c.last_purchase_bill_date,
+        stores.city,
         stores.name as last_purchase_store_name,
+        sm.store_phone_number as store_contact,
         case when upper(stores.state)='GUJARAT' then 'GUJARATI' else 'HINDI' END as language      
     FROM customers c 
     INNER JOIN stores ON c.last_purchase_store_id = stores.id
+    INNER JOIN
+        	store_managers sm
+        	ON stores.id = sm.store_id
     WHERE 
         stores.store_type = 'COCO' 
         AND (
@@ -96,7 +101,8 @@ REPEAT_CUSTOMER_QUERY = '''
             OR c.last_purchase_bill_date + INTERVAL '87 days' = CURRENT_DATE);
     '''
 
-SALES_REPEAT_QUERY = '''
+def get_repeat_sales(customer_id):
+    query = f'''
     SELECT
         si.store_id,
         TO_CHAR(si.created_at::date, 'YYYY-MM-DD') AS "billdate",
@@ -113,28 +119,39 @@ SALES_REPEAT_QUERY = '''
     WHERE 
         sid.deleted_at IS NULL
         AND si.created_at::date >= NOW()-  INTERVAL '90 days'  
+        AND si.customer_id in {customer_id};
     '''
+    return query
 
 LOST_CUSTOMER_QUERY = '''
     SELECT
         c.id AS customer_id,
         c.customer_code,
         c.full_name AS customer_name,
-        c.mobile_number AS mobile_number,
+        c.mobile_number,
         c.no_of_bills,
         c.ltv,
         c.loyalty_points,
-        c.last_purchase_bill_date,
-        CASE 
-            WHEN LOWER(stores.state) = 'gujarat' THEN 'GUJARATI' 
+        c.last_purchase_bill_date,CASE 
+        WHEN LOWER(stores.state) = 'gujarat' 
+            THEN 'GUJARATI' 
             ELSE 'HINDI' 
-        END AS language
-    FROM customers c 
-    INNER JOIN stores ON c.last_purchase_store_id = stores.id
+        END AS language,
+        stores.name as last_purchase_store_name,
+        stores.city,
+        sm.store_phone_number as store_contact
+    FROM 
+        customers c 
+    INNER JOIN 
+        stores 
+        ON c.last_purchase_store_id = stores.id
+    INNER JOIN
+        store_managers sm
+        ON stores.id = sm.store_id
     WHERE 
         stores.store_type = 'COCO' 
         AND (c.last_purchase_bill_date + INTERVAL '6 months' >= CURRENT_DATE
-            AND c.last_purchase_bill_date + INTERVAL '3 months' < CURRENT_DATE);
+        AND c.last_purchase_bill_date + INTERVAL '3 months' < CURRENT_DATE);
     '''
 
 PRODUCT_MAPPED_DATA = '''
@@ -251,6 +268,7 @@ FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
             ELSE 'HINDI' 
         END AS language,
         stores.city,
+        sm.store_phone_number as store_contact,
         CASE 
             WHEN c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE THEN 'MSP'
             WHEN c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE AND c.no_of_bills < 3 THEN 'MSP'
@@ -258,21 +276,25 @@ FIRST_FIVE_BILLS_CUSTOMER_QUERY = '''
             WHEN c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE AND c.no_of_bills > 3 THEN '25_RUPEES'
             ELSE '0' 
         END AS campaign_type
-    FROM customers c 
-    INNER JOIN stores ON c.last_purchase_store_id = stores.id
-    WHERE 
-        stores.store_type = 'COCO' 
-        AND c.no_of_bills < 5 
-        AND c.aov > 100
-        and c.last_purchase_bill_date::date >= '2025-01-01'
-        AND 
-        ( c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
-            OR c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE
-            OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
-        ) 
+        FROM 
+            customers c 
+        INNER JOIN 
+            stores 
+            ON c.last_purchase_store_id = stores.id
+        INNER JOIN
+        	store_managers sm
+        	ON stores.id = sm.store_id
+        WHERE 
+            stores.store_type = 'COCO' 
+            AND c.no_of_bills < 5 
+            AND c.aov > 100
+            AND ( c.last_purchase_bill_date + INTERVAL '27 days' = CURRENT_DATE
+                    OR c.last_purchase_bill_date + INTERVAL '42 days' = CURRENT_DATE
+                    OR c.last_purchase_bill_date + INTERVAL '57 days' = CURRENT_DATE
+                )
     '''
 
-INSERT_GIFT_VOUCHER_STORE_QUERY = '''
+GIFT_VOUCHER_STORE_ID_QUERY = '''
     SELECT 
         id 
     FROM stores
