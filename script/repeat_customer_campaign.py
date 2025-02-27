@@ -40,7 +40,7 @@ def initialize_engines():
         return get_db_engine_pos(), get_db_engine_wms(), get_db_engine_ecom(), get_db_engine_mre()
     except Exception as e:
         logging()
-        raise
+        return
 
 def fetch_repeat_customers(engine_pos):
     try:
