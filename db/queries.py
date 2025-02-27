@@ -305,5 +305,23 @@ GIFT_VOUCHER_STORE_ID_QUERY = '''
         AND id <>24 ; 
     '''
 
+DELETE_MSG_SENT_QUERY = '''
+    DELETE FROM customer_campaigns
+    WHERE 
+        round = 2 
+        AND is_message_sent = true;    
+    '''
+
+UPDATE_ROUNDS_QUERY = '''
+    UPDATE customer_campaigns
+    SET 
+        is_message_sent = false,
+        updated_at = CURRENT_TIMESTAMP,
+        round = CASE WHEN 
+            round = 1 THEN 2 
+            ELSE round END
+    WHERE is_message_sent is true;
+    '''
+
 
 

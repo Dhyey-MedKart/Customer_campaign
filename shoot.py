@@ -5,6 +5,7 @@ from db.queries import get_customer_campaign_data
 from db.common_helper import get_data
 from db.connection import get_db_engine_mre
 from utils.logger import logging
+from shoot.update_shoot_rounds import update_shoot_round
 def main():
     try:
         engine = get_db_engine_mre()
@@ -23,8 +24,13 @@ def main():
         df['round'] = input_round
         
         if send_message(df):
-            print('Done')
+            print('Done sending message')   
 
+        if update_shoot_round:
+            logger.info("Rounds updated successfully")
+        else:
+            raise Exception
+    
     except Exception as e:    
         logging()
 
